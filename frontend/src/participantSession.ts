@@ -17,7 +17,3 @@ export function getParticipantSession(eventId: string): ParticipantSession | nul
 export function setParticipantSession(session: ParticipantSession) {
   localStorage.setItem(key(session.event_id), JSON.stringify(session));
 }
-
-export function clearParticipantSession(eventId: string) {
-  localStorage.removeItem(key(eventId));
-}

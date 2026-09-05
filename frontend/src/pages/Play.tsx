@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ApiError, participantApi } from "../api";
 import { useEventSocket } from "../useEventSocket";
 import { useCountdown } from "../useCountdown";
-import { getParticipantSession, clearParticipantSession } from "../participantSession";
+import { getParticipantSession } from "../participantSession";
 import { ChoiceKey, ParticipantState } from "../types";
 
 const CHOICE_KEYS: ChoiceKey[] = ["A", "B", "C", "D"];
@@ -133,17 +133,6 @@ export default function Play() {
       {resultMessage && <p className="status-message">{resultMessage}</p>}
       {!resultMessage && PHASE_MESSAGE[phase] && <p className="status-message">{PHASE_MESSAGE[phase]}</p>}
       {locked && !resultMessage && <p className="status-message">この問題は回答済みです</p>}
-
-      <button
-        className="btn secondary"
-        style={{ marginTop: 40 }}
-        onClick={() => {
-          clearParticipantSession(eventId);
-          navigate(`/join/${eventId}`);
-        }}
-      >
-        別の名前で参加し直す
-      </button>
     </div>
   );
 }
