@@ -93,6 +93,19 @@ export default function AdminEvent() {
     }
   }
 
+  async function handleDuplicateEvent() {
+    if (!eventId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const created = await adminApi.post<EventAdminDetail>(`/api/admin/events/${eventId}/duplicate`);
+      navigate(`/admin/events/${created.id}`);
+    } catch (err: any) {
+      setError(err.message);
+      setBusy(false);
+    }
+  }
+
   if (!eventId || !event) {
     return <div className="page">読み込み中...</div>;
   }
@@ -111,9 +124,14 @@ export default function AdminEvent() {
             {event.current_question_number ? ` (第${event.current_question_number}問)` : ""}
           </span>
         </div>
-        <button className="btn danger" disabled={busy} onClick={handleDeleteEvent}>
-          大会を削除
-        </button>
+        <div className="row">
+          <button className="btn secondary" disabled={busy} onClick={handleDuplicateEvent}>
+            大会を複製
+          </button>
+          <button className="btn danger" disabled={busy} onClick={handleDeleteEvent}>
+            大会を削除
+          </button>
+        </div>
       </div>
 
       {error && <p style={{ color: "crimson" }}>{error}</p>}

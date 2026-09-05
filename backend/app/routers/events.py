@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, selectinload
 
 from ..database import get_db
-from ..models import Event, Participant, Question
+from ..models import Choice, Event, Participant, Question
 from ..schemas import EventAdminDetail, EventCreateRequest, EventPublic
 from ..security import require_admin
 from ..storage import get_media_storage
@@ -72,6 +72,80 @@ def get_event_admin(event_id: UUID, db: Session = Depends(get_db), _admin=Depend
         participant_count=db.query(Participant).filter(Participant.event_id == e.id).count(),
         question_count=db.query(Question).filter(Question.event_id == e.id).count(),
         current_question_number=current_number,
+    )
+
+
+@router.post("/api/admin/events/{event_id}/duplicate", response_model=EventAdminDetail)
+def duplicate_event(event_id: UUID, db: Session = Depends(get_db), _admin=Depends(require_admin)):
+    """大会を複製する。
+
+    複製されるのは大会名・問題・選択肢(正解・制限時間・メディア・並び順を含む)のみ。
+    参加者・回答記録・実行状態(進行フェーズ)・ランキング結果は複製せず、
+    複製後の大会は新しいIDを持つ独立した「未開始」の大会として作成される。
+    """
+    source = _get_event_or_404(db, event_id)
+    questions = (
+        db.query(Question)
+        .options(selectinload(Question.choices))
+        .filter(Question.event_id == event_id)
+        .order_by(Question.question_number)
+        .all()
+    )
+
+    storage = get_media_storage()
+
+    def _copy_media(url: str | None) -> str | None:
+        if not url:
+            return None
+        try:
+            return storage.copy(url)
+        except Exception:
+            logger.warning(
+                "メディアファイルの複製に失敗したため、元のURLをそのまま使用します: %s", url, exc_info=True
+            )
+            return url
+
+    suffix = "（コピー）"
+    base_name = source.name
+    if len(base_name) + len(suffix) > 200:
+        base_name = base_name[: 200 - len(suffix)]
+    new_event = Event(name=f"{base_name}{suffix}")
+    db.add(new_event)
+    db.flush()  # new_event.id を確定させる
+
+    for q in questions:
+        new_question = Question(
+            event_id=new_event.id,
+            question_number=q.question_number,
+            question_text=q.question_text,
+            question_media_type=q.question_media_type,
+            question_media_url=_copy_media(q.question_media_url),
+            time_limit_seconds=q.time_limit_seconds,
+            correct_choice=q.correct_choice,
+        )
+        for c in q.choices:
+            new_question.choices.append(
+                Choice(
+                    choice_key=c.choice_key,
+                    content_type=c.content_type,
+                    text=c.text,
+                    media_url=_copy_media(c.media_url),
+                )
+            )
+        db.add(new_question)
+
+    db.commit()
+    db.refresh(new_event)
+
+    return EventAdminDetail(
+        id=new_event.id,
+        name=new_event.name,
+        status=new_event.status,
+        phase=new_event.phase,
+        created_at=new_event.created_at,
+        participant_count=0,
+        question_count=len(questions),
+        current_question_number=None,
     )
 
 

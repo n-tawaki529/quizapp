@@ -30,6 +30,15 @@ class MediaStorage(ABC):
         """save() が返したURLに対応するファイルを削除する。存在しない場合は何もしない。"""
         raise NotImplementedError
 
+    @abstractmethod
+    def copy(self, url: str) -> str:
+        """既存のメディアファイルを複製し、複製先の新しいURLを返す。
+
+        大会複製機能で使用する。複製元と複製先が同一ファイルを共有しないようにするため、
+        物理的に別ファイルとして保存する。
+        """
+        raise NotImplementedError
+
 
 class LocalMediaStorage(MediaStorage):
     def __init__(self, base_dir: str, base_url: str):
@@ -56,6 +65,15 @@ class LocalMediaStorage(MediaStorage):
         except OSError:
             pass
 
+    def copy(self, url: str) -> str:
+        src = self._path_for_url(url)
+        if not src.exists():
+            raise FileNotFoundError(f"コピー元のメディアファイルが見つかりません: {url}")
+        filename = f"{uuid.uuid4().hex}{src.suffix}"
+        dest = self.base_dir / filename
+        dest.write_bytes(src.read_bytes())
+        return f"{self.base_url}/{filename}"
+
 
 class S3MediaStorage(MediaStorage):
     """
@@ -75,6 +93,11 @@ class S3MediaStorage(MediaStorage):
     def delete(self, url: str) -> None:
         raise NotImplementedError(
             "S3MediaStorage は未実装です。boto3 を利用した削除処理を実装してください。"
+        )
+
+    def copy(self, url: str) -> str:
+        raise NotImplementedError(
+            "S3MediaStorage は未実装です。boto3 の copy_object 等を利用した複製処理を実装してください。"
         )
 
 
