@@ -100,6 +100,7 @@ export interface ParticipantState {
   server_time: string;
   question: ParticipantQuestionState | null;
   already_answered: boolean;
+  correct_count: number;
 }
 
 export interface ParticipantSession {

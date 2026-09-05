@@ -16,7 +16,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .models import Answer, ChoiceKey, Event, Participant, Question
+from .models import Answer, ChoiceKey, Event, Participant, Question, QuizPhase
 
 
 def _iso(dt: datetime | None) -> str | None:
@@ -87,6 +87,24 @@ def compute_answer_counts(db: Session, question_id: UUID) -> dict:
     for choice, cnt in rows:
         counts[choice.value] = int(cnt)
     return counts
+
+
+def compute_participant_correct_count(db: Session, event: Event, participant_id: UUID | None) -> int:
+    """参加者自身の確定済み正解数を計算する。
+
+    現在表示・回答受付中の問題(正解がまだ会場に発表されていない問題)は含めない。
+    正解発表(CORRECT_ANSWER_SHOWN)以降、または既に次の問題へ進んでいる場合にカウント対象になる。
+    途中参加者は参加後に回答した問題のAnswerしか持たないため、自然に「参加後の問題だけ」が対象になる。
+    """
+    if participant_id is None:
+        return 0
+    query = db.query(Answer).filter(Answer.participant_id == participant_id, Answer.is_correct.is_(True))
+    if event.current_question_id is not None and event.phase not in (
+        QuizPhase.CORRECT_ANSWER_SHOWN,
+        QuizPhase.RANKING,
+    ):
+        query = query.filter(Answer.question_id != event.current_question_id)
+    return query.count()
 
 
 def build_choice_out(choice) -> dict:
@@ -172,6 +190,7 @@ def build_participant_state(db: Session, event: Event, participant_id: UUID | No
         "server_time": _iso(now),
         "question": None,
         "already_answered": already_answered,
+        "correct_count": compute_participant_correct_count(db, event, participant_id),
     }
     if question:
         state["question"] = {

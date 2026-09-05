@@ -95,6 +95,7 @@ export default function Play() {
         {connected ? "接続中" : "再接続中..."}
       </span>
       <p style={{ color: "#6b7280", fontSize: 13 }}>{session.name} さんとして参加中</p>
+      <p className="correct-count-display">現在の正解数：{state?.correct_count ?? 0}問</p>
 
       {state?.question ? (
         <p className="question-text">

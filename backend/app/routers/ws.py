@@ -54,7 +54,7 @@ async def websocket_endpoint(
             await websocket.close(code=4403)
             return
 
-    await manager.connect(str(event_id), role, websocket)
+    await manager.connect(str(event_id), role, websocket, str(participant_id) if participant_id else None)
     try:
         initial_state = _build_initial_state(event_id, role, participant_id)
         if initial_state is None:

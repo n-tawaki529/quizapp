@@ -223,6 +223,16 @@ th, td {
 .conn-ok { background: #d1fae5; color: #065f46; }
 .conn-bad { background: #fee2e2; color: #991b1b; }
 
+.correct-count-display {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f2937;
+  background: #f3f4f6;
+  border-radius: 10px;
+  padding: 6px 14px;
+  display: inline-block;
+}
+
 /* ---------- 会場モニター画面 ---------- */
 .monitor-screen {
   min-height: 100vh;

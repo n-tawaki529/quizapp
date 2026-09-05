@@ -24,11 +24,17 @@ def _get_event_or_404(db: Session, event_id: UUID) -> Event:
 
 def _broadcast_current_state(db: Session, event: Event) -> None:
     monitor_state = build_monitor_state(db, event)
-    participant_state = build_participant_state(db, event)
     admin_state = build_admin_state(db, event)
-    manager.broadcast_all_sync(
-        str(event.id), {"monitor": monitor_state, "participant": participant_state, "admin": admin_state}
-    )
+    manager.broadcast_all_sync(str(event.id), {"monitor": monitor_state, "admin": admin_state})
+
+    # participantロールへは、接続中の参加者ごとに自分自身の正解数(correct_count)を
+    # 個別に計算してパーソナライズした状態を配信する(他人の正解数は一切送らない)。
+    default_participant_state = build_participant_state(db, event)
+    connected_ids = manager.connected_participant_ids(str(event.id))
+    per_participant_state = {
+        pid: build_participant_state(db, event, UUID(pid)) for pid in connected_ids
+    }
+    manager.broadcast_participant_personalized_sync(str(event.id), default_participant_state, per_participant_state)
 
 
 def _close_answer_if_still_open_sync(event_id: UUID, question_id: UUID) -> None:
