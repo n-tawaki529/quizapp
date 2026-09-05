@@ -25,12 +25,21 @@ class MediaStorage(ABC):
         """ファイルを保存し、クライアントからアクセス可能なURL(パス)を返す。"""
         raise NotImplementedError
 
+    @abstractmethod
+    def delete(self, url: str) -> None:
+        """save() が返したURLに対応するファイルを削除する。存在しない場合は何もしない。"""
+        raise NotImplementedError
+
 
 class LocalMediaStorage(MediaStorage):
     def __init__(self, base_dir: str, base_url: str):
         self.base_dir = Path(base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.base_url = base_url.rstrip("/")
+
+    def _path_for_url(self, url: str) -> Path:
+        filename = url.rsplit("/", 1)[-1]
+        return self.base_dir / filename
 
     def save(self, file: UploadFile) -> str:
         suffix = Path(file.filename or "").suffix
@@ -40,6 +49,12 @@ class LocalMediaStorage(MediaStorage):
             while chunk := file.file.read(1024 * 1024):
                 out.write(chunk)
         return f"{self.base_url}/{filename}"
+
+    def delete(self, url: str) -> None:
+        try:
+            self._path_for_url(url).unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 class S3MediaStorage(MediaStorage):
@@ -55,6 +70,11 @@ class S3MediaStorage(MediaStorage):
     def save(self, file: UploadFile) -> str:
         raise NotImplementedError(
             "S3MediaStorage は未実装です。boto3 を利用したアップロード処理を実装してください。"
+        )
+
+    def delete(self, url: str) -> None:
+        raise NotImplementedError(
+            "S3MediaStorage は未実装です。boto3 を利用した削除処理を実装してください。"
         )
 
 

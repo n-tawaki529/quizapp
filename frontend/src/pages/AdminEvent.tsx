@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import { adminApi, getAdminToken, mediaUrl } from "../api";
 import { useEventSocket } from "../useEventSocket";
@@ -16,6 +16,7 @@ const PHASE_LABEL: Record<string, string> = {
 
 export default function AdminEvent() {
   const { eventId } = useParams<{ eventId: string }>();
+  const navigate = useNavigate();
   const [tab, setTab] = useState<"questions" | "quiz" | "qr">("questions");
   const [event, setEvent] = useState<EventAdminDetail | null>(null);
   const [questions, setQuestions] = useState<QuestionAdminOut[]>([]);
@@ -78,6 +79,20 @@ export default function AdminEvent() {
     }
   }
 
+  async function handleDeleteEvent() {
+    if (!eventId) return;
+    if (!window.confirm("この大会を削除しますか？ この操作は元に戻せません。")) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await adminApi.delete(`/api/admin/events/${eventId}`);
+      navigate("/admin");
+    } catch (err: any) {
+      setError(err.message);
+      setBusy(false);
+    }
+  }
+
   if (!eventId || !event) {
     return <div className="page">読み込み中...</div>;
   }
@@ -88,13 +103,20 @@ export default function AdminEvent() {
   return (
     <div className="page">
       <h1>{event.name}</h1>
-      <div className="row" style={{ marginBottom: 12 }}>
-        <span className="badge">{event.status}</span>
-        <span>
-          {PHASE_LABEL[event.phase] ?? event.phase}
-          {event.current_question_number ? ` (第${event.current_question_number}問)` : ""}
-        </span>
+      <div className="row" style={{ marginBottom: 12, justifyContent: "space-between" }}>
+        <div className="row">
+          <span className="badge">{event.status}</span>
+          <span>
+            {PHASE_LABEL[event.phase] ?? event.phase}
+            {event.current_question_number ? ` (第${event.current_question_number}問)` : ""}
+          </span>
+        </div>
+        <button className="btn danger" disabled={busy} onClick={handleDeleteEvent}>
+          大会を削除
+        </button>
       </div>
+
+      {error && <p style={{ color: "crimson" }}>{error}</p>}
 
       <div className="tabs">
         <button className={`tab ${tab === "questions" ? "active" : ""}`} onClick={() => setTab("questions")}>
@@ -183,7 +205,6 @@ export default function AdminEvent() {
       {tab === "quiz" && (
         <div className="card">
           <h2>クイズ進行</h2>
-          {error && <p style={{ color: "crimson" }}>{error}</p>}
           <p>
             WebSocket接続:{" "}
             <span className={connected ? "conn-ok" : "conn-bad"} style={{ padding: "2px 8px", borderRadius: 999 }}>

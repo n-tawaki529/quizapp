@@ -1,14 +1,18 @@
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from ..database import get_db
 from ..models import Event, Participant, Question
 from ..schemas import EventAdminDetail, EventCreateRequest, EventPublic
 from ..security import require_admin
+from ..storage import get_media_storage
 
 router = APIRouter(tags=["events"])
+
+logger = logging.getLogger(__name__)
 
 
 def _get_event_or_404(db: Session, event_id: UUID) -> Event:
@@ -69,6 +73,47 @@ def get_event_admin(event_id: UUID, db: Session = Depends(get_db), _admin=Depend
         question_count=db.query(Question).filter(Question.event_id == e.id).count(),
         current_question_number=current_number,
     )
+
+
+@router.delete("/api/admin/events/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_event(event_id: UUID, db: Session = Depends(get_db), _admin=Depends(require_admin)):
+    """大会を削除する。
+
+    問題・選択肢・参加者・回答記録は全て削除する(DB制約・ORMカスケードにより連鎖削除)。
+    問題・選択肢に紐づくメディアファイルもストレージから削除し、孤児ファイルを残さない。
+    """
+    event = _get_event_or_404(db, event_id)
+
+    questions = (
+        db.query(Question)
+        .options(selectinload(Question.choices))
+        .filter(Question.event_id == event_id)
+        .all()
+    )
+    media_urls: list[str] = []
+    for q in questions:
+        if q.question_media_url:
+            media_urls.append(q.question_media_url)
+        for c in q.choices:
+            if c.media_url:
+                media_urls.append(c.media_url)
+
+    # events.current_question_id が questions.id を参照しているため、
+    # 問題行を削除する前に参照を外しておかないとFK制約違反になる。
+    event.current_question_id = None
+    db.flush()
+
+    db.delete(event)
+    db.commit()
+
+    storage = get_media_storage()
+    for url in media_urls:
+        try:
+            storage.delete(url)
+        except Exception:
+            logger.warning("メディアファイルの削除に失敗しました: %s", url, exc_info=True)
+
+    return None
 
 
 # ---- 公開用(参加者・モニターが大会の基本情報を確認するため) ----
