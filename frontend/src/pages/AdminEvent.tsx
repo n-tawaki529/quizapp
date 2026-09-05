@@ -50,14 +50,15 @@ export default function AdminEvent() {
 
   async function handleDelete(q: QuestionAdminOut) {
     if (!eventId) return;
-    if (!window.confirm(`第${q.question_number}問を削除しますか?`)) return;
+    const label = q.is_practice ? "練習問題" : `第${q.question_number}問`;
+    if (!window.confirm(`${label}を削除しますか?`)) return;
     await adminApi.delete(`/api/admin/events/${eventId}/questions/${q.id}`);
     await loadQuestions();
   }
 
   async function handleMove(index: number, direction: -1 | 1) {
     if (!eventId) return;
-    const newOrder = [...questions];
+    const newOrder = [...normalQuestions];
     const target = index + direction;
     if (target < 0 || target >= newOrder.length) return;
     [newOrder[index], newOrder[target]] = [newOrder[target], newOrder[index]];
@@ -114,6 +115,8 @@ export default function AdminEvent() {
 
   const joinUrl = `${window.location.origin}/join/${eventId}`;
   const monitorUrl = `${window.location.origin}/monitor/${eventId}`;
+  const practiceQuestion = questions.find((q) => q.is_practice) ?? null;
+  const normalQuestions = questions.filter((q) => !q.is_practice);
 
   return (
     <div className="page">
@@ -184,7 +187,25 @@ export default function AdminEvent() {
                 </tr>
               </thead>
               <tbody>
-                {questions.map((q, idx) => (
+                {practiceQuestion && (
+                  <tr key={practiceQuestion.id} style={{ background: "#fef3c7" }}>
+                    <td>
+                      <span className="practice-badge">練習</span>
+                    </td>
+                    <td>{practiceQuestion.question_text}</td>
+                    <td>{practiceQuestion.time_limit_seconds}秒</td>
+                    <td>{practiceQuestion.correct_choice}</td>
+                    <td className="row">
+                      <button className="btn secondary" onClick={() => setEditing(practiceQuestion)}>
+                        編集
+                      </button>
+                      <button className="btn danger" onClick={() => handleDelete(practiceQuestion)}>
+                        削除
+                      </button>
+                    </td>
+                  </tr>
+                )}
+                {normalQuestions.map((q, idx) => (
                   <tr key={q.id}>
                     <td>{q.question_number}</td>
                     <td>{q.question_text}</td>
@@ -197,7 +218,7 @@ export default function AdminEvent() {
                       <button
                         className="btn secondary"
                         onClick={() => handleMove(idx, 1)}
-                        disabled={idx === questions.length - 1}
+                        disabled={idx === normalQuestions.length - 1}
                       >
                         ↓
                       </button>
@@ -223,7 +244,8 @@ export default function AdminEvent() {
             <QuestionForm
               eventId={eventId}
               initial={editing === "new" ? null : editing}
-              nextQuestionNumber={questions.length + 1}
+              nextQuestionNumber={normalQuestions.length + 1}
+              hasPracticeQuestion={practiceQuestion !== null}
               onSaved={async () => {
                 setEditing(null);
                 await loadQuestions();
@@ -244,7 +266,12 @@ export default function AdminEvent() {
             </span>
           </p>
           <p style={{ fontSize: 18, fontWeight: 700 }}>
-            {state?.question ? `第${state.question.question_number}問` : "問題未表示"}・
+            {state?.question
+              ? state.question.is_practice
+                ? "練習問題"
+                : `第${state.question.question_number}問`
+              : "問題未表示"}
+            ・
             {PHASE_LABEL[state?.phase ?? ""] ?? "-"}
           </p>
           <p>

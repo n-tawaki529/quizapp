@@ -233,6 +233,16 @@ th, td {
   display: inline-block;
 }
 
+.practice-badge {
+  display: inline-block;
+  font-size: 15px;
+  font-weight: 800;
+  color: #92400e;
+  background: #fef3c7;
+  border-radius: 10px;
+  padding: 4px 12px;
+}
+
 /* ---------- 会場モニター画面 ---------- */
 .monitor-screen {
   min-height: 100vh;

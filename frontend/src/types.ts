@@ -42,6 +42,7 @@ export interface QuestionAdminOut {
   time_limit_seconds: number;
   correct_choice: ChoiceKey;
   choices: ChoiceOut[];
+  is_practice: boolean;
 }
 
 export interface RankingEntry {
@@ -60,6 +61,7 @@ export interface MonitorQuestionState {
   question_media_url: string | null;
   time_limit_seconds: number;
   choices: ChoiceOut[];
+  is_practice: boolean;
 }
 
 export interface MonitorState {
@@ -88,6 +90,7 @@ export interface ParticipantQuestionState {
   question_number: number;
   question_text: string;
   choice_keys: ChoiceKey[];
+  is_practice: boolean;
 }
 
 export interface ParticipantState {

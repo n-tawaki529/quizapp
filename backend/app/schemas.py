@@ -65,6 +65,7 @@ class QuestionCreateRequest(BaseModel):
     time_limit_seconds: int = 10
     correct_choice: ChoiceKey
     choices: list[ChoiceInput]
+    is_practice: bool = False
 
 
 class QuestionUpdateRequest(BaseModel):
@@ -75,6 +76,7 @@ class QuestionUpdateRequest(BaseModel):
     time_limit_seconds: int | None = None
     correct_choice: ChoiceKey | None = None
     choices: list[ChoiceInput] | None = None
+    is_practice: bool | None = None
 
 
 class QuestionAdminOut(BaseModel):
@@ -86,6 +88,7 @@ class QuestionAdminOut(BaseModel):
     time_limit_seconds: int
     correct_choice: ChoiceKey
     choices: list[ChoiceOut]
+    is_practice: bool
 
     class Config:
         from_attributes = True

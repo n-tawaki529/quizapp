@@ -51,9 +51,22 @@ def create_question(
     if count >= MAX_QUESTIONS_PER_EVENT:
         raise HTTPException(status_code=422, detail=f"1大会につき最大{MAX_QUESTIONS_PER_EVENT}問までです")
 
+    if body.is_practice:
+        # 練習問題は1大会に1問のみ。問題番号は常に0番を予約し、実問題(1以上)とは独立させる。
+        existing_practice = (
+            db.query(Question).filter(Question.event_id == event_id, Question.is_practice.is_(True)).first()
+        )
+        if existing_practice:
+            raise HTTPException(status_code=422, detail="練習問題はすでに設定されています")
+        question_number = 0
+    else:
+        if body.question_number <= 0:
+            raise HTTPException(status_code=422, detail="問題番号は1以上を指定してください")
+        question_number = body.question_number
+
     existing = (
         db.query(Question)
-        .filter(Question.event_id == event_id, Question.question_number == body.question_number)
+        .filter(Question.event_id == event_id, Question.question_number == question_number)
         .first()
     )
     if existing:
@@ -61,12 +74,13 @@ def create_question(
 
     question = Question(
         event_id=event_id,
-        question_number=body.question_number,
+        question_number=question_number,
         question_text=body.question_text,
         question_media_type=body.question_media_type,
         question_media_url=body.question_media_url,
         time_limit_seconds=body.time_limit_seconds,
         correct_choice=body.correct_choice,
+        is_practice=body.is_practice,
     )
     for c in body.choices:
         question.choices.append(
@@ -91,19 +105,45 @@ def update_question(
     if question is None or question.event_id != event_id:
         raise HTTPException(status_code=404, detail="問題が見つかりません")
 
-    if body.question_number is not None and body.question_number != question.question_number:
+    if body.is_practice is True and not question.is_practice:
+        # 他に練習問題が存在しないことを確認してから練習問題化する
+        existing_practice = (
+            db.query(Question)
+            .filter(Question.event_id == event_id, Question.is_practice.is_(True), Question.id != question_id)
+            .first()
+        )
+        if existing_practice:
+            raise HTTPException(status_code=422, detail="練習問題はすでに設定されています")
+
+    target_is_practice = body.is_practice if body.is_practice is not None else question.is_practice
+    if target_is_practice:
+        target_question_number = 0
+    else:
+        if body.question_number is not None:
+            target_question_number = body.question_number
+        elif question.is_practice:
+            raise HTTPException(status_code=422, detail="練習問題を通常問題に変更する場合は新しい問題番号を指定してください")
+        else:
+            target_question_number = question.question_number
+        if target_question_number <= 0:
+            raise HTTPException(status_code=422, detail="通常問題の問題番号は1以上を指定してください")
+
+    if target_question_number != question.question_number:
         existing = (
             db.query(Question)
             .filter(
                 Question.event_id == event_id,
-                Question.question_number == body.question_number,
+                Question.question_number == target_question_number,
                 Question.id != question_id,
             )
             .first()
         )
         if existing:
             raise HTTPException(status_code=422, detail="同じ問題番号がすでに存在します")
-        question.question_number = body.question_number
+        question.question_number = target_question_number
+
+    if body.is_practice is not None:
+        question.is_practice = body.is_practice
 
     if body.question_text is not None:
         question.question_text = body.question_text
@@ -150,13 +190,15 @@ def reorder_questions(
 ):
     _get_event_or_404(db, event_id)
     questions = db.query(Question).filter(Question.event_id == event_id).all()
-    by_id = {q.id: q for q in questions}
+    # 練習問題(0番)は並び替えの対象外とし、常に先頭固定のまま維持する。
+    reorderable = [q for q in questions if not q.is_practice]
+    by_id = {q.id: q for q in reorderable}
     if set(by_id.keys()) != set(body.question_ids):
         raise HTTPException(status_code=422, detail="問題IDの一覧が一致しません")
 
     # 一旦重複を避けるため大きなオフセット番号にしてからコミット
     offset = 10000
-    for q in questions:
+    for q in reorderable:
         q.question_number += offset
     db.flush()
     for idx, qid in enumerate(body.question_ids, start=1):

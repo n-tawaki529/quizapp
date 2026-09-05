@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import ForeignKey, Integer, String, UniqueConstraint, DateTime, Text
+from sqlalchemy import Boolean, ForeignKey, Integer, String, UniqueConstraint, DateTime, Text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -99,6 +99,7 @@ class Question(Base):
     question_media_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     time_limit_seconds: Mapped[int] = mapped_column(Integer, default=10, nullable=False)
     correct_choice: Mapped[ChoiceKey] = mapped_column(SAEnum(ChoiceKey, name="choice_key_correct"), nullable=False)
+    is_practice: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)

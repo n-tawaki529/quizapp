@@ -43,6 +43,7 @@ app.mount(settings.media_base_url, StaticFiles(directory=settings.media_local_di
 def on_startup():
     Base.metadata.create_all(bind=engine)
     _ensure_quiz_phase_enum_values()
+    _ensure_question_practice_column()
     manager.set_loop(asyncio.get_event_loop())
 
 
@@ -54,6 +55,17 @@ def _ensure_quiz_phase_enum_values() -> None:
         conn = conn.execution_options(isolation_level="AUTOCOMMIT")
         for value in ("ANSWER_COUNT_SHOWN", "CORRECT_ANSWER_SHOWN"):
             conn.execute(text(f"ALTER TYPE quiz_phase ADD VALUE IF NOT EXISTS '{value}'"))
+
+
+def _ensure_question_practice_column() -> None:
+    """create_all() は既存のquestionsテーブルに新しいカラムを追加してくれないため、
+    アプリ起動時に is_practice カラムが無ければ安全に追加する(既存データは一切変更しない)。
+    """
+    with engine.connect() as conn:
+        conn = conn.execution_options(isolation_level="AUTOCOMMIT")
+        conn.execute(
+            text("ALTER TABLE questions ADD COLUMN IF NOT EXISTS is_practice BOOLEAN NOT NULL DEFAULT FALSE")
+        )
 
 
 @app.get("/api/health")

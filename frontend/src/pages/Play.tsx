@@ -99,7 +99,11 @@ export default function Play() {
 
       {state?.question ? (
         <p className="question-text">
-          第{state.question.question_number}問
+          {state.question.is_practice ? (
+            <span className="practice-badge">練習問題(得点対象外)</span>
+          ) : (
+            `第${state.question.question_number}問`
+          )}
           <br />
           {state.question.question_text}
         </p>

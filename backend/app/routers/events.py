@@ -139,6 +139,7 @@ def duplicate_event(event_id: UUID, db: Session = Depends(get_db), _admin=Depend
             question_media_url=_copy_media(q.question_media_url),
             time_limit_seconds=q.time_limit_seconds,
             correct_choice=q.correct_choice,
+            is_practice=q.is_practice,
         )
         for c in q.choices:
             new_question.choices.append(

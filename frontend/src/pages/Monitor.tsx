@@ -53,7 +53,9 @@ export default function Monitor() {
       {!q && <h1>{state.event_name ?? "クイズ大会"}</h1>}
       {q && (
         <>
-          <p style={{ opacity: 0.7, fontSize: 24 }}>第{q.question_number}問</p>
+          <p style={{ opacity: 0.7, fontSize: 24 }}>
+            {q.is_practice ? <span className="practice-badge">練習問題(得点対象外)</span> : `第${q.question_number}問`}
+          </p>
           <p className="monitor-question-text">{q.question_text}</p>
           {q.question_media_type === "IMAGE" && q.question_media_url && (
             <img className="monitor-media" src={mediaUrl(q.question_media_url)} />

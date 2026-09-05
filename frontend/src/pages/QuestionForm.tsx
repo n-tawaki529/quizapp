@@ -14,6 +14,7 @@ interface Props {
   eventId: string;
   initial?: QuestionAdminOut | null;
   nextQuestionNumber: number;
+  hasPracticeQuestion: boolean;
   onSaved: () => void;
   onCancel: () => void;
 }
@@ -37,8 +38,16 @@ function buildInitialChoices(initial?: QuestionAdminOut | null): Record<ChoiceKe
   return base;
 }
 
-export default function QuestionForm({ eventId, initial, nextQuestionNumber, onSaved, onCancel }: Props) {
+export default function QuestionForm({
+  eventId,
+  initial,
+  nextQuestionNumber,
+  hasPracticeQuestion,
+  onSaved,
+  onCancel,
+}: Props) {
   const [questionNumber, setQuestionNumber] = useState(initial?.question_number ?? nextQuestionNumber);
+  const [isPractice, setIsPractice] = useState(initial?.is_practice ?? false);
   const [questionText, setQuestionText] = useState(initial?.question_text ?? "");
   const [questionMediaType, setQuestionMediaType] = useState<MediaType>(initial?.question_media_type ?? "NONE");
   const [questionMediaUrl, setQuestionMediaUrl] = useState(initial?.question_media_url ?? "");
@@ -83,12 +92,13 @@ export default function QuestionForm({ eventId, initial, nextQuestionNumber, onS
     setSaving(true);
     try {
       const body = {
-        question_number: questionNumber,
+        question_number: isPractice ? 0 : questionNumber,
         question_text: questionText,
         question_media_type: questionMediaType,
         question_media_url: questionMediaType === "NONE" ? null : questionMediaUrl || null,
         time_limit_seconds: timeLimit,
         correct_choice: correctChoice,
+        is_practice: isPractice,
         choices: CHOICE_KEYS.map((key) => ({
           choice_key: key,
           content_type: choices[key].content_type,
@@ -114,13 +124,32 @@ export default function QuestionForm({ eventId, initial, nextQuestionNumber, onS
       <h3>{initial ? "問題を編集" : "問題を追加"}</h3>
       {error && <p style={{ color: "crimson" }}>{error}</p>}
 
+      <div className="field">
+        <label>
+          <input
+            type="checkbox"
+            checked={isPractice}
+            disabled={hasPracticeQuestion && !initial?.is_practice}
+            onChange={(e) => setIsPractice(e.target.checked)}
+          />{" "}
+          これは練習問題です(得点・ランキングには反映されません。1大会に1問まで)
+        </label>
+        {hasPracticeQuestion && !initial?.is_practice && (
+          <p style={{ fontSize: 12, color: "#6b7280" }}>
+            既に練習問題が設定されているため、新たに練習問題として登録することはできません。
+          </p>
+        )}
+      </div>
+
       <div className="row">
         <div className="field" style={{ width: 120 }}>
           <label>問題番号</label>
           <input
             type="number"
             min={1}
-            value={questionNumber}
+            value={isPractice ? "" : questionNumber}
+            disabled={isPractice}
+            placeholder={isPractice ? "練習問題(常に先頭)" : undefined}
             onChange={(e) => setQuestionNumber(Number(e.target.value))}
           />
         </div>

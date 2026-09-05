@@ -69,6 +69,12 @@ def _advance_to_next_question(db: Session, event: Event) -> Question:
     if event.current_question_id:
         current_q = db.get(Question, event.current_question_id)
         current_number = current_q.question_number if current_q else 0
+    elif (
+        db.query(Question).filter(Question.event_id == event.id, Question.is_practice.is_(True)).first()
+        is not None
+    ):
+        # 大会開始直後、練習問題(問題番号0番に予約)が存在する場合はそちらを先に出題する。
+        current_number = -1
 
     next_q = (
         db.query(Question)

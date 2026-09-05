@@ -24,7 +24,10 @@ def _iso(dt: datetime | None) -> str | None:
 
 
 def compute_ranking(db: Session, event_id: UUID, limit: int = 5) -> list[dict]:
-    """正答数の多い順、次に正解問題の合計回答時間が短い順にランキングを算出する。"""
+    """正答数の多い順、次に正解問題の合計回答時間が短い順にランキングを算出する。
+
+    練習問題(is_practice=True)への回答は集計対象外とする。
+    """
     rows = (
         db.query(
             Answer.participant_id,
@@ -33,7 +36,9 @@ def compute_ranking(db: Session, event_id: UUID, limit: int = 5) -> list[dict]:
                 func.sum(Answer.response_time_ms).filter(Answer.is_correct.is_(True)), 0
             ).label("total_time_ms"),
         )
+        .join(Question, Question.id == Answer.question_id)
         .filter(Answer.participant_id.in_(select(Participant.id).where(Participant.event_id == event_id)))
+        .filter(Question.is_practice.is_(False))
         .group_by(Answer.participant_id)
         .all()
     )
@@ -98,7 +103,15 @@ def compute_participant_correct_count(db: Session, event: Event, participant_id:
     """
     if participant_id is None:
         return 0
-    query = db.query(Answer).filter(Answer.participant_id == participant_id, Answer.is_correct.is_(True))
+    query = (
+        db.query(Answer)
+        .join(Question, Question.id == Answer.question_id)
+        .filter(
+            Answer.participant_id == participant_id,
+            Answer.is_correct.is_(True),
+            Question.is_practice.is_(False),
+        )
+    )
     if event.current_question_id is not None and event.phase not in (
         QuizPhase.CORRECT_ANSWER_SHOWN,
         QuizPhase.RANKING,
@@ -151,6 +164,7 @@ def build_monitor_state(db: Session, event: Event) -> dict:
             "question_media_url": question.question_media_url,
             "time_limit_seconds": question.time_limit_seconds,
             "choices": [build_choice_out(c) for c in question.choices],
+            "is_practice": question.is_practice,
         }
         if event.phase.value in ("ANSWER_COUNT_SHOWN", "CORRECT_ANSWER_SHOWN"):
             state["answer_counts"] = compute_answer_counts(db, question.id)
@@ -198,6 +212,7 @@ def build_participant_state(db: Session, event: Event, participant_id: UUID | No
             "question_number": question.question_number,
             "question_text": question.question_text,
             "choice_keys": [c.value for c in ChoiceKey],
+            "is_practice": question.is_practice,
         }
     return state
 
