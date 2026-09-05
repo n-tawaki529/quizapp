@@ -194,4 +194,6 @@ def build_admin_state(db: Session, event: Event) -> dict:
         answered_count = db.query(Answer).filter(Answer.question_id == event.current_question_id).count()
     state["answered_count"] = answered_count
     state["connected_participant_count"] = manager.count(str(event.id), "participant")
+    # クイズ進行画面に常時表示するランキング上位5名(人数が0でもエラーにならない)。
+    state["top_ranking"] = compute_ranking(db, event.id, limit=5)
     return state

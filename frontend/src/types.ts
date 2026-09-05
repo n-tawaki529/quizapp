@@ -80,6 +80,7 @@ export interface MonitorState {
   participant_count?: number;
   answered_count?: number;
   connected_participant_count?: number;
+  top_ranking?: RankingEntry[];
 }
 
 export interface ParticipantQuestionState {

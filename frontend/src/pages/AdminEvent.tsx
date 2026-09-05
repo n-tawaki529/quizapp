@@ -366,6 +366,34 @@ export default function AdminEvent() {
               </tbody>
             </table>
           )}
+
+          <div className="card" style={{ background: "#f9fafb", marginTop: 16 }}>
+            <strong>現在のランキング(上位5位)</strong>
+            {state?.top_ranking && state.top_ranking.length > 0 ? (
+              <table style={{ marginTop: 8 }}>
+                <thead>
+                  <tr>
+                    <th>順位</th>
+                    <th>名前</th>
+                    <th>正答数</th>
+                    <th>合計回答時間</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {state.top_ranking.map((r) => (
+                    <tr key={r.participant_id}>
+                      <td>{r.rank}</td>
+                      <td>{r.name}</td>
+                      <td>{r.correct_count}</td>
+                      <td>{(r.total_response_time_ms / 1000).toFixed(3)}秒</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p style={{ marginTop: 8, color: "#6b7280" }}>まだ参加者の回答がありません。</p>
+            )}
+          </div>
         </div>
       )}
 
