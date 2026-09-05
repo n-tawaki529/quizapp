@@ -266,6 +266,25 @@ th, td {
   font-size: 32px;
   font-weight: 700;
   min-height: 140px;
+  position: relative;
+  transition: outline 0.2s, transform 0.2s;
+}
+
+.monitor-choice.correct {
+  outline: 8px solid #fbbf24;
+  transform: scale(1.03);
+}
+
+.monitor-count-badge {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  padding: 4px 14px;
+  border-radius: 999px;
+  font-size: 22px;
+  font-weight: 800;
 }
 
 .monitor-choice img, .monitor-choice video {

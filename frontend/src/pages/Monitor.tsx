@@ -64,16 +64,29 @@ export default function Monitor() {
 
           {state.phase === "ANSWER_OPEN" && seconds !== null && <p className="monitor-countdown">{seconds}</p>}
           {state.phase === "ANSWER_CLOSED" && <p style={{ fontSize: 36, fontWeight: 800 }}>回答受付終了</p>}
+          {state.phase === "ANSWER_COUNT_SHOWN" && <p style={{ fontSize: 36, fontWeight: 800 }}>回答結果発表</p>}
+          {state.phase === "CORRECT_ANSWER_SHOWN" && state.correct_choice && (
+            <p style={{ fontSize: 36, fontWeight: 800 }}>正解は　{state.correct_choice}</p>
+          )}
 
           <div className="monitor-choice-grid">
-            {q.choices.map((c) => (
-              <div key={c.choice_key} className={`monitor-choice ${CHOICE_CLASS[c.choice_key]}`}>
-                <span>{c.choice_key}</span>
-                {c.content_type === "TEXT" && <span>{c.text}</span>}
-                {c.content_type === "IMAGE" && c.media_url && <img src={mediaUrl(c.media_url)} />}
-                {c.content_type === "VIDEO" && c.media_url && <video src={mediaUrl(c.media_url)} muted autoPlay loop />}
-              </div>
-            ))}
+            {q.choices.map((c) => {
+              const isCorrect = state.phase === "CORRECT_ANSWER_SHOWN" && state.correct_choice === c.choice_key;
+              return (
+                <div
+                  key={c.choice_key}
+                  className={`monitor-choice ${CHOICE_CLASS[c.choice_key]} ${isCorrect ? "correct" : ""}`}
+                >
+                  <span>{c.choice_key}</span>
+                  {c.content_type === "TEXT" && <span>{c.text}</span>}
+                  {c.content_type === "IMAGE" && c.media_url && <img src={mediaUrl(c.media_url)} />}
+                  {c.content_type === "VIDEO" && c.media_url && <video src={mediaUrl(c.media_url)} muted autoPlay loop />}
+                  {state.answer_counts && (state.phase === "ANSWER_COUNT_SHOWN" || state.phase === "CORRECT_ANSWER_SHOWN") && (
+                    <span className="monitor-count-badge">{state.answer_counts[c.choice_key]}人</span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </>
       )}

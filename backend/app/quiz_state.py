@@ -71,6 +71,24 @@ def compute_ranking(db: Session, event_id: UUID, limit: int = 5) -> list[dict]:
     return ranked
 
 
+def compute_answer_counts(db: Session, question_id: UUID) -> dict:
+    """指定した問題について、選択肢ごとに「回答するボタンを押して確定した」参加者数を集計する。
+
+    Answer テーブルには確定済みの回答のみが保存されるため(選択しただけの状態はDBに残らない)、
+    このテーブルをそのまま集計すればよい。
+    """
+    counts = {key.value: 0 for key in ChoiceKey}
+    rows = (
+        db.query(Answer.choice, func.count(Answer.id))
+        .filter(Answer.question_id == question_id)
+        .group_by(Answer.choice)
+        .all()
+    )
+    for choice, cnt in rows:
+        counts[choice.value] = int(cnt)
+    return counts
+
+
 def build_choice_out(choice) -> dict:
     return {
         "choice_key": choice.choice_key.value,
@@ -103,6 +121,8 @@ def build_monitor_state(db: Session, event: Event) -> dict:
         "server_time": _iso(now),
         "question": None,
         "ranking": None,
+        "answer_counts": None,
+        "correct_choice": None,
     }
     if question:
         state["question"] = {
@@ -114,6 +134,10 @@ def build_monitor_state(db: Session, event: Event) -> dict:
             "time_limit_seconds": question.time_limit_seconds,
             "choices": [build_choice_out(c) for c in question.choices],
         }
+        if event.phase.value in ("ANSWER_COUNT_SHOWN", "CORRECT_ANSWER_SHOWN"):
+            state["answer_counts"] = compute_answer_counts(db, question.id)
+        if event.phase.value == "CORRECT_ANSWER_SHOWN":
+            state["correct_choice"] = question.correct_choice.value
     if event.phase.value == "RANKING":
         state["ranking"] = compute_ranking(db, event.id)
     return state

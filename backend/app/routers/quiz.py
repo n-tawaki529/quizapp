@@ -57,10 +57,8 @@ async def _auto_close_after_deadline(event_id: UUID, question_id: UUID, deadline
 
 
 # ---------------- 管理者: クイズ進行操作 ----------------
-@router.post("/api/admin/events/{event_id}/next")
-def next_question(event_id: UUID, db: Session = Depends(get_db), _admin=Depends(require_admin)):
-    event = _get_event_or_404(db, event_id)
-
+def _advance_to_next_question(db: Session, event: Event) -> Question:
+    """次の問題を表示状態にする(回答受付はまだ開始しない)。次の問題がなければ422を送出する。"""
     current_number = 0
     if event.current_question_id:
         current_q = db.get(Question, event.current_question_id)
@@ -68,7 +66,7 @@ def next_question(event_id: UUID, db: Session = Depends(get_db), _admin=Depends(
 
     next_q = (
         db.query(Question)
-        .filter(Question.event_id == event_id, Question.question_number == current_number + 1)
+        .filter(Question.event_id == event.id, Question.question_number == current_number + 1)
         .first()
     )
     if next_q is None:
@@ -80,6 +78,21 @@ def next_question(event_id: UUID, db: Session = Depends(get_db), _admin=Depends(
     event.answer_deadline = None
     if event.status == EventStatus.CREATED:
         event.status = EventStatus.RUNNING
+    return next_q
+
+
+def _open_answer_window(event: Event, question: Question) -> None:
+    """回答受付を開始し、制限時間の締切と計測開始時刻を記録する。"""
+    now = datetime.now(timezone.utc)
+    event.answer_started_at = now
+    event.answer_deadline = now + timedelta(seconds=question.time_limit_seconds)
+    event.phase = QuizPhase.ANSWER_OPEN
+
+
+@router.post("/api/admin/events/{event_id}/next")
+def next_question(event_id: UUID, db: Session = Depends(get_db), _admin=Depends(require_admin)):
+    event = _get_event_or_404(db, event_id)
+    _advance_to_next_question(db, event)
     db.commit()
     db.refresh(event)
 
@@ -96,15 +109,54 @@ def start_answer(event_id: UUID, db: Session = Depends(get_db), _admin=Depends(r
         raise HTTPException(status_code=422, detail="回答受付を開始できる状態ではありません")
 
     question = db.get(Question, event.current_question_id)
-    now = datetime.now(timezone.utc)
-    event.answer_started_at = now
-    event.answer_deadline = now + timedelta(seconds=question.time_limit_seconds)
-    event.phase = QuizPhase.ANSWER_OPEN
+    _open_answer_window(event, question)
     db.commit()
     db.refresh(event)
 
     _broadcast_current_state(db, event)
     manager.schedule_sync(_auto_close_after_deadline(event.id, question.id, event.answer_deadline))
+    return {"ok": True}
+
+
+@router.post("/api/admin/events/{event_id}/next-and-start-answer")
+def next_and_start_answer(event_id: UUID, db: Session = Depends(get_db), _admin=Depends(require_admin)):
+    """「次の問題へ」と「回答開始」をまとめて1回の操作で行う。"""
+    event = _get_event_or_404(db, event_id)
+    next_q = _advance_to_next_question(db, event)
+    _open_answer_window(event, next_q)
+    db.commit()
+    db.refresh(event)
+
+    _broadcast_current_state(db, event)
+    manager.schedule_sync(_auto_close_after_deadline(event.id, next_q.id, event.answer_deadline))
+    return {"ok": True}
+
+
+@router.post("/api/admin/events/{event_id}/show-answer-count")
+def show_answer_count(event_id: UUID, db: Session = Depends(get_db), _admin=Depends(require_admin)):
+    """回答受付終了後、各選択肢の回答人数を会場モニターに表示する(正解はまだ発表しない)。"""
+    event = _get_event_or_404(db, event_id)
+    if event.phase != QuizPhase.ANSWER_CLOSED:
+        raise HTTPException(status_code=422, detail="回答受付終了後に実行してください")
+    event.phase = QuizPhase.ANSWER_COUNT_SHOWN
+    db.commit()
+    db.refresh(event)
+
+    _broadcast_current_state(db, event)
+    return {"ok": True}
+
+
+@router.post("/api/admin/events/{event_id}/show-correct-answer")
+def show_correct_answer(event_id: UUID, db: Session = Depends(get_db), _admin=Depends(require_admin)):
+    """回答人数表示後、正解を会場モニターに発表する。"""
+    event = _get_event_or_404(db, event_id)
+    if event.phase != QuizPhase.ANSWER_COUNT_SHOWN:
+        raise HTTPException(status_code=422, detail="回答結果を表示してから実行してください")
+    event.phase = QuizPhase.CORRECT_ANSWER_SHOWN
+    db.commit()
+    db.refresh(event)
+
+    _broadcast_current_state(db, event)
     return {"ok": True}
 
 

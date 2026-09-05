@@ -11,6 +11,8 @@ const PHASE_LABEL: Record<string, string> = {
   QUESTION_SHOWN: "回答待機中",
   ANSWER_OPEN: "回答受付中",
   ANSWER_CLOSED: "回答受付終了",
+  ANSWER_COUNT_SHOWN: "回答人数表示中",
+  CORRECT_ANSWER_SHOWN: "正解発表済み",
   RANKING: "ランキング表示中",
 };
 
@@ -291,6 +293,42 @@ export default function AdminEvent() {
               }
             >
               回答開始
+            </button>
+            <button
+              className="btn"
+              disabled={busy}
+              onClick={() =>
+                runAction(
+                  () => adminApi.post(`/api/admin/events/${eventId}/next-and-start-answer`),
+                  "次の問題へ進み、同時に回答受付を開始します。よろしいですか?"
+                )
+              }
+            >
+              次の問題へ+回答開始
+            </button>
+            <button
+              className="btn"
+              disabled={busy || state?.phase !== "ANSWER_CLOSED"}
+              onClick={() =>
+                runAction(
+                  () => adminApi.post(`/api/admin/events/${eventId}/show-answer-count`),
+                  "回答人数を会場モニターに表示します。よろしいですか?"
+                )
+              }
+            >
+              回答結果を表示
+            </button>
+            <button
+              className="btn"
+              disabled={busy || state?.phase !== "ANSWER_COUNT_SHOWN"}
+              onClick={() =>
+                runAction(
+                  () => adminApi.post(`/api/admin/events/${eventId}/show-correct-answer`),
+                  "正解を発表します。よろしいですか?"
+                )
+              }
+            >
+              正解発表
             </button>
             <button
               className="btn"

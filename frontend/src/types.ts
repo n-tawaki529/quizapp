@@ -4,6 +4,8 @@ export type QuizPhase =
   | "QUESTION_SHOWN"
   | "ANSWER_OPEN"
   | "ANSWER_CLOSED"
+  | "ANSWER_COUNT_SHOWN"
+  | "CORRECT_ANSWER_SHOWN"
   | "RANKING";
 
 export type ChoiceKey = "A" | "B" | "C" | "D";
@@ -73,6 +75,8 @@ export interface MonitorState {
   server_time: string;
   question: MonitorQuestionState | null;
   ranking: RankingEntry[] | null;
+  answer_counts: Record<ChoiceKey, number> | null;
+  correct_choice: ChoiceKey | null;
   participant_count?: number;
   answered_count?: number;
   connected_participant_count?: number;

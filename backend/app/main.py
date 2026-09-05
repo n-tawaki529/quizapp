@@ -4,6 +4,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
 
 from .config import get_settings
 from .database import Base, engine
@@ -41,7 +42,18 @@ app.mount(settings.media_base_url, StaticFiles(directory=settings.media_local_di
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
+    _ensure_quiz_phase_enum_values()
     manager.set_loop(asyncio.get_event_loop())
+
+
+def _ensure_quiz_phase_enum_values() -> None:
+    """create_all() は既存のPostgres ENUM型に新しい値を追加してくれないため、
+    アプリ起動時に不足している quiz_phase の値を安全に追加する(既存データは一切変更しない)。
+    """
+    with engine.connect() as conn:
+        conn = conn.execution_options(isolation_level="AUTOCOMMIT")
+        for value in ("ANSWER_COUNT_SHOWN", "CORRECT_ANSWER_SHOWN"):
+            conn.execute(text(f"ALTER TYPE quiz_phase ADD VALUE IF NOT EXISTS '{value}'"))
 
 
 @app.get("/api/health")

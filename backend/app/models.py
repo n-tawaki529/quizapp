@@ -25,7 +25,9 @@ class QuizPhase(str, enum.Enum):
     NOT_STARTED = "NOT_STARTED"        # まだ問題が出題されていない
     QUESTION_SHOWN = "QUESTION_SHOWN"  # 問題表示中、回答受付前
     ANSWER_OPEN = "ANSWER_OPEN"        # 回答受付中
-    ANSWER_CLOSED = "ANSWER_CLOSED"    # 回答受付終了
+    ANSWER_CLOSED = "ANSWER_CLOSED"    # 回答受付終了(まだ結果は見せない)
+    ANSWER_COUNT_SHOWN = "ANSWER_COUNT_SHOWN"  # 各選択肢の回答人数を表示中(正解はまだ非公開)
+    CORRECT_ANSWER_SHOWN = "CORRECT_ANSWER_SHOWN"  # 正解発表済み
     RANKING = "RANKING"                # ランキング表示中
 
 
