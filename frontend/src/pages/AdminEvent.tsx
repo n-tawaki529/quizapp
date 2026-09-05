@@ -128,6 +128,18 @@ export default function AdminEvent() {
           <button className="btn secondary" disabled={busy} onClick={handleDuplicateEvent}>
             大会を複製
           </button>
+          <button
+            className="btn secondary"
+            disabled={busy}
+            onClick={() =>
+              runAction(
+                () => adminApi.post(`/api/admin/events/${eventId}/reset`),
+                "この大会をリセットしますか？\n参加者・回答記録・ランキング結果は削除され、元に戻せません。"
+              )
+            }
+          >
+            大会をリセット
+          </button>
           <button className="btn danger" disabled={busy} onClick={handleDeleteEvent}>
             大会を削除
           </button>

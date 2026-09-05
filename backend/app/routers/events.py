@@ -5,10 +5,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, selectinload
 
 from ..database import get_db
-from ..models import Choice, Event, Participant, Question
+from ..models import Choice, Event, EventStatus, Participant, Question, QuizPhase
+from ..quiz_state import build_admin_state, build_monitor_state, build_participant_state
 from ..schemas import EventAdminDetail, EventCreateRequest, EventPublic
 from ..security import require_admin
 from ..storage import get_media_storage
+from ..ws_manager import manager
 
 router = APIRouter(tags=["events"])
 
@@ -20,6 +22,15 @@ def _get_event_or_404(db: Session, event_id: UUID) -> Event:
     if event is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="大会が見つかりません")
     return event
+
+
+def _broadcast_current_state(db: Session, event: Event) -> None:
+    monitor_state = build_monitor_state(db, event)
+    participant_state = build_participant_state(db, event)
+    admin_state = build_admin_state(db, event)
+    manager.broadcast_all_sync(
+        str(event.id), {"monitor": monitor_state, "participant": participant_state, "admin": admin_state}
+    )
 
 
 # ---- 管理者用 ----
@@ -145,6 +156,41 @@ def duplicate_event(event_id: UUID, db: Session = Depends(get_db), _admin=Depend
         created_at=new_event.created_at,
         participant_count=0,
         question_count=len(questions),
+        current_question_number=None,
+    )
+
+
+@router.post("/api/admin/events/{event_id}/reset", response_model=EventAdminDetail)
+def reset_event(event_id: UUID, db: Session = Depends(get_db), _admin=Depends(require_admin)):
+    """大会をリセットし、同じ問題セットで再度実施できる状態に戻す。
+
+    問題・選択肢・メディア・設定はそのまま残し、参加者・回答記録・ランキング結果のみ削除する。
+    大会の状態は CREATED / NOT_STARTED に戻り、QRコードから新たに参加者が参加できるようになる。
+    """
+    event = _get_event_or_404(db, event_id)
+
+    # participants を削除すると DB の ondelete=CASCADE により紐づく answers も連鎖削除される。
+    db.query(Participant).filter(Participant.event_id == event_id).delete(synchronize_session=False)
+
+    event.current_question_id = None
+    event.phase = QuizPhase.NOT_STARTED
+    event.status = EventStatus.CREATED
+    event.answer_started_at = None
+    event.answer_deadline = None
+    db.commit()
+    db.refresh(event)
+
+    _broadcast_current_state(db, event)
+
+    question_count = db.query(Question).filter(Question.event_id == event_id).count()
+    return EventAdminDetail(
+        id=event.id,
+        name=event.name,
+        status=event.status,
+        phase=event.phase,
+        created_at=event.created_at,
+        participant_count=0,
+        question_count=question_count,
         current_question_number=None,
     )
 
