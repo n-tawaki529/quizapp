@@ -12,6 +12,8 @@ const PHASE_MESSAGE: Record<string, string> = {
   NOT_STARTED: "まもなく大会が始まります。しばらくお待ちください。",
   QUESTION_SHOWN: "会場モニターの問題をご覧ください。まもなく回答が開始されます。",
   ANSWER_CLOSED: "回答受付は終了しました。結果をお待ちください。",
+  ANSWER_COUNT_SHOWN: "回答結果発表中です。会場モニターをご覧ください。",
+  CORRECT_ANSWER_SHOWN: "正解発表中です。会場モニターをご覧ください。",
   RANKING: "ランキング発表中です。会場モニターをご覧ください。",
 };
 
@@ -55,7 +57,6 @@ export default function Play() {
   async function handleAnswer(choice: ChoiceKey) {
     if (!eventId || !session || !state?.question || locked || submitting) return;
     setSubmitting(true);
-    setSelected(choice);
     try {
       const res = await participantApi.post<{ accepted: boolean; message: string }>(
         `/api/events/${eventId}/answer`,
@@ -113,12 +114,20 @@ export default function Play() {
             key={key}
             className={`choice-btn choice-${key.toLowerCase()} ${selected === key ? "selected" : ""}`}
             disabled={!canAnswer || submitting}
-            onClick={() => handleAnswer(key)}
+            onClick={() => setSelected(key)}
           >
             {key}
           </button>
         ))}
       </div>
+
+      <button
+        className="btn confirm-answer-btn"
+        disabled={!canAnswer || selected === null || submitting}
+        onClick={() => selected && handleAnswer(selected)}
+      >
+        回答する
+      </button>
 
       {resultMessage && <p className="status-message">{resultMessage}</p>}
       {!resultMessage && PHASE_MESSAGE[phase] && <p className="status-message">{PHASE_MESSAGE[phase]}</p>}

@@ -185,6 +185,19 @@ th, td {
 .choice-c { background: var(--color-c); }
 .choice-d { background: var(--color-d); }
 
+.confirm-answer-btn {
+  width: 100%;
+  max-width: 420px;
+  padding: 18px 10px;
+  font-size: 22px;
+  font-weight: 800;
+  border-radius: 16px;
+}
+
+.confirm-answer-btn:disabled {
+  opacity: 0.45;
+}
+
 .status-message {
   font-size: 16px;
   color: #374151;
