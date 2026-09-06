@@ -3,8 +3,8 @@ import { mediaUrl } from "../api";
 import { useEventSocket } from "../useEventSocket";
 import { useCountdown } from "../useCountdown";
 import { MonitorState } from "../types";
-
-const CHOICE_CLASS: Record<string, string> = { A: "choice-a", B: "choice-b", C: "choice-c", D: "choice-d" };
+import ChoiceCard from "../components/monitor/ChoiceCard";
+import QuestionInfoPanel from "../components/monitor/QuestionInfoPanel";
 
 export default function Monitor() {
   const { eventId } = useParams<{ eventId: string }>();
@@ -40,23 +40,33 @@ export default function Monitor() {
             ))}
           </tbody>
         </table>
-        {!connected && <p style={{ color: "#f87171" }}>サーバーとの接続が切れています。再接続を試みています...</p>}
+        {!connected && <p style={{ color: "#b91c1c" }}>サーバーとの接続が切れています。再接続を試みています...</p>}
       </div>
     );
   }
 
   const q = state.question;
+  // Choiceの content_type が全てTEXTなら文章問題(縦並び)、それ以外(IMAGE/VIDEO)が含まれれば
+  // 画像・動画問題(2x2)として扱う。既存のChoiceデータ構造(content_type)をそのまま利用。
+  const isMediaChoices = !!q && q.choices.some((c) => c.content_type !== "TEXT");
+  // answer_deadline が設定されている(=一度でも回答受付を開始した)間はタイマーを表示する。
+  // ANSWER_OPEN中は残り秒数、受付終了後は締切を過ぎているため useCountdown が自然に0を返す。
+  // QUESTION_SHOWN(まだ回答受付前)は answer_deadline が null のため非表示のまま(既存仕様通り)。
+  const showTimer = state.answer_deadline !== null;
 
   return (
     <div className="monitor-screen">
-      {!connected && <p style={{ color: "#f87171" }}>サーバーとの接続が切れています。再接続を試みています...</p>}
-      {!q && <h1>{state.event_name ?? "クイズ大会"}</h1>}
+      {!connected && <p style={{ color: "#b91c1c" }}>サーバーとの接続が切れています。再接続を試みています...</p>}
+      {!q && <h1 className="monitor-question-text">{state.event_name ?? "クイズ大会"}</h1>}
       {q && (
         <>
-          <p style={{ opacity: 0.7, fontSize: 24 }}>
+          <p className="monitor-status-bar">
             {q.is_practice ? <span className="practice-badge">練習問題(得点対象外)</span> : `第${q.question_number}問`}
+            {state.phase === "ANSWER_CLOSED" && <span>回答受付終了</span>}
+            {state.phase === "ANSWER_COUNT_SHOWN" && <span>回答結果発表</span>}
+            {state.phase === "CORRECT_ANSWER_SHOWN" && state.correct_choice && <span>正解は　{state.correct_choice}</span>}
           </p>
-          <p className="monitor-question-text">{q.question_text}</p>
+
           {q.question_media_type === "IMAGE" && q.question_media_url && (
             <img className="monitor-media" src={mediaUrl(q.question_media_url)} />
           )}
@@ -64,31 +74,30 @@ export default function Monitor() {
             <video className="monitor-media" src={mediaUrl(q.question_media_url)} controls autoPlay />
           )}
 
-          {state.phase === "ANSWER_OPEN" && seconds !== null && <p className="monitor-countdown">{seconds}</p>}
-          {state.phase === "ANSWER_CLOSED" && <p style={{ fontSize: 36, fontWeight: 800 }}>回答受付終了</p>}
-          {state.phase === "ANSWER_COUNT_SHOWN" && <p style={{ fontSize: 36, fontWeight: 800 }}>回答結果発表</p>}
-          {state.phase === "CORRECT_ANSWER_SHOWN" && state.correct_choice && (
-            <p style={{ fontSize: 36, fontWeight: 800 }}>正解は　{state.correct_choice}</p>
-          )}
-
-          <div className="monitor-choice-grid">
-            {q.choices.map((c) => {
-              const isCorrect = state.phase === "CORRECT_ANSWER_SHOWN" && state.correct_choice === c.choice_key;
-              return (
-                <div
-                  key={c.choice_key}
-                  className={`monitor-choice ${CHOICE_CLASS[c.choice_key]} ${isCorrect ? "correct" : ""}`}
-                >
-                  <span>{c.choice_key}</span>
-                  {c.content_type === "TEXT" && <span>{c.text}</span>}
-                  {c.content_type === "IMAGE" && c.media_url && <img src={mediaUrl(c.media_url)} />}
-                  {c.content_type === "VIDEO" && c.media_url && <video src={mediaUrl(c.media_url)} muted autoPlay loop />}
-                  {state.answer_counts && (state.phase === "ANSWER_COUNT_SHOWN" || state.phase === "CORRECT_ANSWER_SHOWN") && (
-                    <span className="monitor-count-badge">{state.answer_counts[c.choice_key]}人</span>
-                  )}
-                </div>
-              );
-            })}
+          <div className="monitor-main">
+            <div className="monitor-choices-area">
+              <div className={isMediaChoices ? "monitor-choice-grid-media" : "monitor-choice-list-text"}>
+                {q.choices.map((c) => (
+                  <ChoiceCard
+                    key={c.choice_key}
+                    choice={c}
+                    variant={isMediaChoices ? "media" : "text"}
+                    count={
+                      state.answer_counts &&
+                      (state.phase === "ANSWER_COUNT_SHOWN" || state.phase === "CORRECT_ANSWER_SHOWN")
+                        ? state.answer_counts[c.choice_key]
+                        : null
+                    }
+                    dim={
+                      state.phase === "CORRECT_ANSWER_SHOWN" &&
+                      state.correct_choice !== null &&
+                      state.correct_choice !== c.choice_key
+                    }
+                  />
+                ))}
+              </div>
+            </div>
+            <QuestionInfoPanel questionText={q.question_text} seconds={showTimer ? seconds : null} />
           </div>
         </>
       )}

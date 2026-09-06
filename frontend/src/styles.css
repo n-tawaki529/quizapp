@@ -8,6 +8,12 @@
   --color-b: #3b82f6;
   --color-c: #f59e0b;
   --color-d: #10b981;
+  /* 会場モニター専用の選択肢カラー(参加者スマホ画面の --color-a〜d とは別物、色順にも注意)。
+     A/1:青 B/2:赤 C/3:緑 D/4:黄 */
+  --monitor-color-a: #2563eb;
+  --monitor-color-b: #dc2626;
+  --monitor-color-c: #16a34a;
+  --monitor-color-d: #eab308;
 }
 
 * {
@@ -247,14 +253,16 @@ th, td {
 .monitor-screen {
   min-height: 100vh;
   width: 100vw;
-  background: #0f172a;
-  color: #fff;
+  /* 上:鮮やかなオレンジ → 中央:淡いオレンジ → 下:白に近いクリーム色 */
+  background: linear-gradient(180deg, #ff7e1a 0%, #ffb877 42%, #fff8ec 100%);
+  color: #3b0764;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px;
-  gap: 32px;
+  padding: 32px;
+  gap: 20px;
+  overflow: hidden;
 }
 
 .monitor-question-text {
@@ -263,59 +271,260 @@ th, td {
   text-align: center;
 }
 
+.monitor-status-bar {
+  font-size: 24px;
+  font-weight: 700;
+  text-align: center;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
 .monitor-media {
-  max-width: 70vw;
-  max-height: 30vh;
+  max-width: 60vw;
+  max-height: 22vh;
   border-radius: 12px;
 }
 
-.monitor-choice-grid {
+/* 問題表示エリア全体(選択肢 + 右側の問題情報パネル) */
+.monitor-main {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 32px;
+  width: 100%;
+  max-width: 1760px;
+  flex: 1;
+  min-height: 0;
+}
+
+.monitor-choices-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+
+/* 文章問題: 4択を縦方向に配置 */
+.monitor-choice-list-text {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  width: 100%;
+}
+
+/* 画像・動画問題: 2x2配置 */
+.monitor-choice-grid-media {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 24px;
+  grid-template-rows: 1fr 1fr;
+  gap: 22px;
   width: 100%;
-  max-width: 1100px;
+  height: 100%;
 }
 
-.monitor-choice {
-  border-radius: 20px;
-  padding: 20px;
+.monitor-choice-card {
+  position: relative;
+  background: #fff;
+  border-radius: 24px;
+  border: 7px solid transparent;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+}
+
+.monitor-choice-card.color-a { border-color: var(--monitor-color-a); }
+.monitor-choice-card.color-b { border-color: var(--monitor-color-b); }
+.monitor-choice-card.color-c { border-color: var(--monitor-color-c); }
+.monitor-choice-card.color-d { border-color: var(--monitor-color-d); }
+
+/* 正解発表: 不正解の3択をカード全体(枠・番号・テキスト/メディア・回答人数)ごと暗く表示する。
+   正解の選択肢は現在の明るさを維持するため何もクラスを付けない。 */
+.monitor-choice-card.dim {
+  filter: brightness(0.42) saturate(0.7);
+}
+
+.monitor-choice-card.text-card {
   display: flex;
   align-items: center;
-  gap: 20px;
-  font-size: 32px;
-  font-weight: 700;
-  min-height: 140px;
-  position: relative;
-  transition: outline 0.2s, transform 0.2s;
+  gap: 24px;
+  padding: 18px 32px;
+  min-height: 120px;
 }
 
-.monitor-choice.correct {
-  outline: 8px solid #fbbf24;
-  transform: scale(1.03);
+.monitor-choice-card.text-card .monitor-choice-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
 }
 
-.monitor-count-badge {
-  position: absolute;
-  top: 12px;
-  right: 16px;
-  background: rgba(0, 0, 0, 0.55);
+.monitor-choice-card.media-card {
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+  min-height: 0;
+  height: 100%;
+}
+
+.monitor-choice-card.media-card .monitor-choice-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.monitor-choice-number {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
   color: #fff;
-  padding: 4px 14px;
-  border-radius: 999px;
-  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34px;
   font-weight: 800;
 }
 
-.monitor-choice img, .monitor-choice video {
-  max-height: 160px;
-  max-width: 260px;
-  border-radius: 10px;
+.monitor-choice-card.media-card .monitor-choice-number {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 46px;
+  height: 46px;
+  font-size: 22px;
+  z-index: 2;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
-.monitor-countdown {
-  font-size: 120px;
+.monitor-choice-number.color-a { background: var(--monitor-color-a); }
+.monitor-choice-number.color-b { background: var(--monitor-color-b); }
+.monitor-choice-number.color-c { background: var(--monitor-color-c); }
+.monitor-choice-number.color-d { background: var(--monitor-color-d); }
+
+.monitor-choice-text {
+  font-size: 38px;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1.25;
+}
+
+.monitor-choice-media-wrap {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #f3f4f6;
+  min-height: 0;
+}
+
+.monitor-choice-media-wrap img,
+.monitor-choice-media-wrap video {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* 回答人数ボックス(数字のみ表示、単位は付けない)。色は対応する選択肢カラーに合わせる。 */
+.monitor-count-badge {
+  color: #fff;
   font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  z-index: 2;
+}
+
+.monitor-count-badge.text-badge {
+  flex-shrink: 0;
+  min-width: 110px;
+  height: 64px;
+  font-size: 34px;
+  padding: 0 16px;
+}
+
+.monitor-count-badge.media-badge {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  min-width: 60px;
+  height: 48px;
+  font-size: 26px;
+  padding: 0 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.monitor-count-badge.color-a { background: var(--monitor-color-a); }
+.monitor-count-badge.color-b { background: var(--monitor-color-b); }
+.monitor-count-badge.color-c { background: var(--monitor-color-c); }
+.monitor-count-badge.color-d { background: var(--monitor-color-d); }
+
+/* 右側の問題情報パネル(Q / 縦書き問題文 / 残り時間) */
+.monitor-question-panel {
+  flex: 0 0 210px;
+  display: flex;
+  flex-direction: column;
+  border-radius: 46px;
+  border: 6px solid #fff;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.monitor-qpanel-q {
+  background: #3b0764;
+  color: #fff;
+  font-size: 52px;
+  font-weight: 900;
+  text-align: center;
+  padding: 14px 0 6px;
+}
+
+.monitor-qpanel-text {
+  flex: 1;
+  background: linear-gradient(180deg, #d9d0f5 0%, #7c6bd4 55%, #33409e 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 6px;
+  overflow: hidden;
+}
+
+.monitor-qpanel-text p {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  font-size: 28px;
+  font-weight: 800;
+  color: #1e1b4b;
+  line-height: 1.35;
+  max-height: 100%;
+  margin: 0;
+}
+
+.monitor-qpanel-timer {
+  background: #33409e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px 0 26px;
+}
+
+.monitor-qpanel-timer-circle {
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  background: #dc2626;
+  border: 4px solid #fff;
+  color: #fff;
+  font-size: 42px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .monitor-ranking-table {
@@ -325,8 +534,8 @@ th, td {
 }
 
 .monitor-ranking-table th, .monitor-ranking-table td {
-  border-bottom: 1px solid #334155;
-  color: #fff;
+  border-bottom: 1px solid rgba(59, 7, 100, 0.25);
+  color: #3b0764;
   padding: 14px 18px;
 }
 
