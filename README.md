@@ -62,7 +62,7 @@ quizapp/
 ```
 events(id, name, status, current_question_id, phase, answer_started_at, answer_deadline, created_at)
 questions(id, event_id, question_number, question_text, question_media_type, question_media_url,
-          time_limit_seconds, correct_choice, created_at, updated_at)
+          time_limit_seconds, correct_choice, is_practice, created_at, updated_at)
 choices(id, question_id, choice_key[A-D], content_type[TEXT/IMAGE/VIDEO], text, media_url)
 participants(id, event_id, name, joined_at)
 answers(id, participant_id, question_id, choice, answered_at, response_time_ms, is_correct)
@@ -70,7 +70,10 @@ answers(id, participant_id, question_id, choice, answered_at, response_time_ms, 
 ```
 
 - `status`: CREATED → RUNNING → FINISHED (WAITINGは将来の待機ロビー用に予約、現行UIでは未使用)
-- `phase`: NOT_STARTED → QUESTION_SHOWN → ANSWER_OPEN → ANSWER_CLOSED → RANKING
+- `phase`: NOT_STARTED → QUESTION_SHOWN → ANSWER_OPEN → ANSWER_CLOSED → ANSWER_COUNT_SHOWN → CORRECT_ANSWER_SHOWN → RANKING
+  - `ANSWER_COUNT_SHOWN`: 回答受付終了後、各選択肢の回答人数を会場モニターに表示(正解はまだ非公開)
+  - `CORRECT_ANSWER_SHOWN`: 正解を会場モニターに発表
+- `is_practice`: 練習問題フラグ。1大会につき1問のみ登録可能(`question_number=0`を予約)。ランキング集計・参加者の正解数集計からは除外される。
 - 回答時間は `response_time_ms`(整数ミリ秒)で保存。`answered_at - answer_started_at` をサーバー時刻で計算。
 
 ## 4. API一覧
@@ -95,7 +98,10 @@ answers(id, participant_id, question_id, choice, answered_at, response_time_ms, 
 | PUT | /api/admin/events/{id}/questions/reorder/apply | 問題並び替え |
 | POST | /api/admin/media/upload | メディアアップロード |
 | POST | /api/admin/events/{id}/next | 次の問題へ |
+| POST | /api/admin/events/{id}/next-and-start-answer | 次の問題へ＋回答開始をまとめて実行 |
 | POST | /api/admin/events/{id}/start-answer | 回答開始 |
+| POST | /api/admin/events/{id}/show-answer-count | 各選択肢の回答人数を表示(正解は非公開) |
+| POST | /api/admin/events/{id}/show-correct-answer | 正解を発表 |
 | POST | /api/admin/events/{id}/show-ranking | ランキング表示 |
 | GET | /api/admin/events/{id}/ranking | ランキングプレビュー |
 | GET | /api/admin/events/{id}/state | 管理画面用の詳細状態 |
@@ -108,8 +114,11 @@ answers(id, participant_id, question_id, choice, answered_at, response_time_ms, 
   - 次の問題へ(question_shown)
   - 回答開始(answer_open、`answer_deadline`を含む)
   - 制限時間経過による自動締切(answer_closed)
+  - 回答人数表示(answer_count_shown、選択肢ごとの回答人数`answer_counts`を含む。正解はまだ非公開)
+  - 正解発表(correct_answer_shown、正解キー`correct_choice`を含む)
   - ランキング表示(ranking)
 - 管理者ロールのみ、回答が届くたびに軽量な`answer_count_update`メッセージも受信する。
+- 参加者ロールへの状態には、自分自身の確定正解数(`correct_count`)も個別に計算して含まれる(他人の正解数は一切送らない)。
 - カウントダウンはサーバーからの`answer_deadline`/`server_time`を基準にクライアント側で計算表示する(信頼できる基準はサーバー時刻)。
 
 ## 6. 画面一覧
@@ -180,8 +189,10 @@ npm run dev
 7. 「回答開始」→ 参加者・モニターでカウントダウンが同期して表示される
 8. 参加者がA〜Dのいずれかをタップ→「回答を受け付けました」表示、再タップ不可
 9. 制限時間終了で自動的に回答受付終了(管理者が何もしなくても締切られる)
-10. 「ランキング表示」→ モニターに上位5人が表示される
-11. 参加者画面や管理者画面のWebSocketを開発者ツールで切断→自動的に再接続し、現在の状態に復元されることを確認
+10. 「回答人数を表示」→ モニターに選択肢ごとの回答人数が表示される(正解はまだ非公開)
+11. 「正解を発表」→ モニターに正解の選択肢がハイライト表示される
+12. 「ランキング表示」→ モニターに上位5人が表示される
+13. 参加者画面や管理者画面のWebSocketを開発者ツールで切断→自動的に再接続し、現在の状態に復元されることを確認
 
 ## 10. テスト方法
 
@@ -227,6 +238,7 @@ python scripts/load_test.py --base-url http://localhost:8000 --event-id <大会U
 | 9 | 画像・動画対応 | 完了 |
 | 10 | 通信切断・再接続対応 | 完了 |
 | 11 | 200人同時接続を想定した負荷テスト | スクリプト用意(実環境での大規模実行は未実施) |
+| 12 | 練習問題・回答人数表示・正解発表フェーズの追加 | 完了 |
 
 ## 13. 既知の制約・残課題
 
