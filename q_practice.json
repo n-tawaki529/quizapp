@@ -1,0 +1,31 @@
+{
+    "question_number":  0,
+    "is_practice":  true,
+    "correct_choice":  "A",
+    "question_text":  "これは練習問題です。ボタンを押す練習をしましょう。",
+    "choices":  [
+                    {
+                        "content_type":  "TEXT",
+                        "choice_key":  "A",
+                        "text":  "りんご"
+                    },
+                    {
+                        "content_type":  "TEXT",
+                        "choice_key":  "B",
+                        "text":  "みかん"
+                    },
+                    {
+                        "content_type":  "TEXT",
+                        "choice_key":  "C",
+                        "text":  "ぶどう"
+                    },
+                    {
+                        "content_type":  "TEXT",
+                        "choice_key":  "D",
+                        "text":  "もも"
+                    }
+                ],
+    "question_media_url":  null,
+    "time_limit_seconds":  10,
+    "question_media_type":  "NONE"
+}

@@ -1,0 +1,31 @@
+{
+    "question_number":  1,
+    "is_practice":  false,
+    "correct_choice":  "B",
+    "question_text":  "日本の首都はどこでしょう？",
+    "choices":  [
+                    {
+                        "content_type":  "TEXT",
+                        "choice_key":  "A",
+                        "text":  "大阪"
+                    },
+                    {
+                        "content_type":  "TEXT",
+                        "choice_key":  "B",
+                        "text":  "東京"
+                    },
+                    {
+                        "content_type":  "TEXT",
+                        "choice_key":  "C",
+                        "text":  "京都"
+                    },
+                    {
+                        "content_type":  "TEXT",
+                        "choice_key":  "D",
+                        "text":  "名古屋"
+                    }
+                ],
+    "question_media_url":  null,
+    "time_limit_seconds":  120,
+    "question_media_type":  "NONE"
+}

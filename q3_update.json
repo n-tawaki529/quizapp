@@ -1,0 +1,31 @@
+{
+    "question_number":  3,
+    "is_practice":  false,
+    "correct_choice":  "C",
+    "question_text":  "この動画は何かの見本です。正しい選択肢を選んでください。",
+    "choices":  [
+                    {
+                        "content_type":  "TEXT",
+                        "choice_key":  "A",
+                        "text":  "選択肢1"
+                    },
+                    {
+                        "content_type":  "TEXT",
+                        "choice_key":  "B",
+                        "text":  "選択肢2"
+                    },
+                    {
+                        "content_type":  "TEXT",
+                        "choice_key":  "C",
+                        "text":  "選択肢3(正解)"
+                    },
+                    {
+                        "content_type":  "TEXT",
+                        "choice_key":  "D",
+                        "text":  "選択肢4"
+                    }
+                ],
+    "question_media_url":  "/media/d6ece327e9414e7da764910697f45650.mp4",
+    "time_limit_seconds":  120,
+    "question_media_type":  "VIDEO"
+}
