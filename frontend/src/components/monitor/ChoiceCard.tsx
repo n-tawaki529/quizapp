@@ -5,7 +5,7 @@ import { ChoiceKey, ChoiceOut } from "../../types";
 // 会場モニター専用の色順(参加者スマホ画面の --color-a〜d とは別定義)。
 // A/1:青 B/2:赤 C/3:緑 D/4:黄
 const COLOR_CLASS: Record<ChoiceKey, string> = { A: "color-a", B: "color-b", C: "color-c", D: "color-d" };
-const LABEL: Record<ChoiceKey, string> = { A: "1", B: "2", C: "3", D: "4" };
+export const CHOICE_LABEL: Record<ChoiceKey, string> = { A: "1", B: "2", C: "3", D: "4" };
 
 interface Props {
   choice: ChoiceOut;
@@ -19,7 +19,7 @@ interface Props {
 
 function ChoiceCard({ choice, variant, count, dim }: Props) {
   const colorClass = COLOR_CLASS[choice.choice_key];
-  const label = LABEL[choice.choice_key];
+  const label = CHOICE_LABEL[choice.choice_key];
 
   return (
     <div

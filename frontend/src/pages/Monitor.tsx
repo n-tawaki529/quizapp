@@ -52,7 +52,6 @@ export default function Monitor() {
             {q.is_practice ? <span className="practice-badge">練習問題(得点対象外)</span> : `第${q.question_number}問`}
             {state.phase === "ANSWER_CLOSED" && <span>回答受付終了</span>}
             {state.phase === "ANSWER_COUNT_SHOWN" && <span>回答結果発表</span>}
-            {state.phase === "CORRECT_ANSWER_SHOWN" && state.correct_choice && <span>正解は　{state.correct_choice}</span>}
           </p>
 
           {q.question_media_type === "IMAGE" && q.question_media_url && (

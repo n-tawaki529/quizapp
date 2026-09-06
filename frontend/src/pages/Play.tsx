@@ -7,6 +7,8 @@ import { getParticipantSession } from "../participantSession";
 import { ChoiceKey, ParticipantState } from "../types";
 
 const CHOICE_KEYS: ChoiceKey[] = ["A", "B", "C", "D"];
+// 会場モニターの問題表示画面と揃えた表示用ラベル(内部的な選択肢キーA〜Dはそのまま、見た目のみ1〜4)。
+const CHOICE_LABEL: Record<ChoiceKey, string> = { A: "1", B: "2", C: "3", D: "4" };
 
 const PHASE_MESSAGE: Record<string, string> = {
   NOT_STARTED: "まもなく大会が始まります。しばらくお待ちください。",
@@ -121,7 +123,7 @@ export default function Play() {
             disabled={!canAnswer || submitting}
             onClick={() => setSelected(key)}
           >
-            {key}
+            {CHOICE_LABEL[key]}
           </button>
         ))}
       </div>
