@@ -527,16 +527,87 @@ th, td {
   justify-content: center;
 }
 
-.monitor-ranking-table {
-  width: 100%;
-  max-width: 800px;
-  font-size: 28px;
+.monitor-ranking-title {
+  font-size: 40px;
+  font-weight: 900;
+  color: #7c2d12;
+  text-align: center;
+  text-shadow: 0 2px 4px rgba(255, 255, 255, 0.4);
+  margin: 0;
 }
 
-.monitor-ranking-table th, .monitor-ranking-table td {
-  border-bottom: 1px solid rgba(59, 7, 100, 0.25);
-  color: #3b0764;
-  padding: 14px 18px;
+/* ランキング画面: 順位・参加者名・正解数・回答時間合計を横並びの帯として表示する。
+   各セグメントは同一行内で継ぎ目なく繋がるよう、行コンテナ側の border-radius + overflow:hidden で
+   角丸をまとめて処理し、個々のセグメントには角丸を付けない。 */
+.monitor-ranking-board {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(1100px, 92vw);
+  max-height: 100%;
+  overflow: hidden;
+}
+
+.monitor-ranking-row {
+  display: flex;
+  align-items: stretch;
+  height: 64px;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 3px 8px rgba(59, 7, 100, 0.25);
+}
+
+.monitor-ranking-rank {
+  flex-shrink: 0;
+  width: 92px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #16215c;
+  color: #fff;
+  font-size: 34px;
+  font-weight: 900;
+}
+
+.monitor-ranking-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 26px;
+  background: linear-gradient(180deg, #3d5fe6 0%, #1f3aa8 100%);
+  color: #fff;
+  font-size: 28px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.monitor-ranking-correct {
+  flex-shrink: 0;
+  width: 108px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eab308;
+  color: #16215c;
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.monitor-ranking-time {
+  flex-shrink: 0;
+  width: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 22px;
+  background: linear-gradient(180deg, #3d5fe6 0%, #1f3aa8 100%);
+  color: #fff;
+  font-size: 24px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 
 .qr-box {

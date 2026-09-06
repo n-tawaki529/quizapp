@@ -171,7 +171,9 @@ def build_monitor_state(db: Session, event: Event) -> dict:
         if event.phase.value == "CORRECT_ANSWER_SHOWN":
             state["correct_choice"] = question.correct_choice.value
     if event.phase.value == "RANKING":
-        state["ranking"] = compute_ranking(db, event.id)
+        # 会場モニターのランキング画面は最大10位まで表示する(表示件数のみの変更、
+        # 順位算出ロジック(compute_ranking内の集計・ソート・同点処理)は一切変更しない)。
+        state["ranking"] = compute_ranking(db, event.id, limit=10)
     return state
 
 

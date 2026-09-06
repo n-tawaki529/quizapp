@@ -5,6 +5,7 @@ import { useCountdown } from "../useCountdown";
 import { MonitorState } from "../types";
 import ChoiceCard from "../components/monitor/ChoiceCard";
 import QuestionInfoPanel from "../components/monitor/QuestionInfoPanel";
+import RankingRow from "../components/monitor/RankingRow";
 
 export default function Monitor() {
   const { eventId } = useParams<{ eventId: string }>();
@@ -19,27 +20,14 @@ export default function Monitor() {
   if (state.phase === "RANKING" && state.ranking) {
     return (
       <div className="monitor-screen">
-        <h1>ランキング TOP 5</h1>
-        <table className="monitor-ranking-table">
-          <thead>
-            <tr>
-              <th>順位</th>
-              <th>名前</th>
-              <th>正答数</th>
-              <th>合計回答時間</th>
-            </tr>
-          </thead>
-          <tbody>
-            {state.ranking.map((r) => (
-              <tr key={r.participant_id}>
-                <td>{r.rank}</td>
-                <td>{r.name}</td>
-                <td>{r.correct_count}問</td>
-                <td>{(r.total_response_time_ms / 1000).toFixed(3)}秒</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <h1 className="monitor-ranking-title">ランキング TOP10</h1>
+        <div className="monitor-ranking-board">
+          {/* 表示順は state.ranking(バックエンドの compute_ranking が算出した順位)をそのまま使用し、
+              フロント側での再計算・再ソートは一切行わない。 */}
+          {state.ranking.map((r) => (
+            <RankingRow key={r.participant_id} entry={r} />
+          ))}
+        </div>
         {!connected && <p style={{ color: "#b91c1c" }}>サーバーとの接続が切れています。再接続を試みています...</p>}
       </div>
     );
