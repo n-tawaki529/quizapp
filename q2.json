@@ -1,0 +1,31 @@
+{
+    "question_number":  2,
+    "is_practice":  false,
+    "correct_choice":  "A",
+    "question_text":  "赤色の画像はどれでしょう？",
+    "choices":  [
+                    {
+                        "content_type":  "IMAGE",
+                        "choice_key":  "A",
+                        "media_url":  "/media/09b902a1889546689905fe749ffe4bc5.png"
+                    },
+                    {
+                        "content_type":  "IMAGE",
+                        "choice_key":  "B",
+                        "media_url":  "/media/bd6ced92db4a416f897d176f54170c94.png"
+                    },
+                    {
+                        "content_type":  "IMAGE",
+                        "choice_key":  "C",
+                        "media_url":  "/media/d7300b61b8c54d6ea7f110fc83263159.png"
+                    },
+                    {
+                        "content_type":  "IMAGE",
+                        "choice_key":  "D",
+                        "media_url":  "/media/6822d3785a0c47baa66e32a524b00eda.png"
+                    }
+                ],
+    "question_media_url":  null,
+    "time_limit_seconds":  15,
+    "question_media_type":  "NONE"
+}
