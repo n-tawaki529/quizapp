@@ -205,6 +205,7 @@ def build_participant_state(db: Session, event: Event, participant_id: UUID | No
         "remaining_ms": remaining_ms,
         "server_time": _iso(now),
         "question": None,
+        "participant_valid": participant_id is not None and db.get(Participant, participant_id) is not None,
         "already_answered": already_answered,
         "correct_count": compute_participant_correct_count(db, event, participant_id),
     }

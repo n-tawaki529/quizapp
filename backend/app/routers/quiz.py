@@ -228,7 +228,10 @@ def submit_answer(
     event = _get_event_or_404(db, event_id)
     participant = db.get(Participant, body.participant_id)
     if participant is None or participant.event_id != event_id:
-        raise HTTPException(status_code=404, detail="参加者が見つかりません")
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "PARTICIPANT_NOT_FOUND", "message": "参加者が見つかりません"},
+        )
 
     if event.phase != QuizPhase.ANSWER_OPEN or event.current_question_id != body.question_id:
         return AnswerResult(accepted=False, message="現在この問題の回答は受け付けていません")

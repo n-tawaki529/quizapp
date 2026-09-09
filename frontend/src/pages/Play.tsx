@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ApiError, participantApi } from "../api";
+import { ApiError, isInvalidParticipantError, participantApi } from "../api";
 import { useEventSocket } from "../useEventSocket";
 import { useCountdown } from "../useCountdown";
-import { getParticipantSession } from "../participantSession";
+import { clearParticipantSession, getParticipantSession, validateParticipantSession } from "../participantSession";
 import { ChoiceKey, ParticipantState } from "../types";
 
 const CHOICE_KEYS: ChoiceKey[] = ["A", "B", "C", "D"];
@@ -31,6 +31,26 @@ export default function Play() {
   });
 
   const remainingMs = useCountdown(state?.answer_deadline, state?.server_time);
+  const sessionToken = session?.token;
+
+  useEffect(() => {
+    if (state?.participant_valid === false && eventId) {
+      clearParticipantSession(eventId);
+      navigate(`/join/${eventId}`, { replace: true });
+    }
+  }, [eventId, navigate, state?.participant_valid]);
+
+  useEffect(() => {
+    if (!eventId || !sessionToken) return;
+    validateParticipantSession(eventId, session)
+      .then((valid) => {
+        if (!valid) {
+          clearParticipantSession(eventId);
+          navigate(`/join/${eventId}`, { replace: true });
+        }
+      })
+      .catch(() => undefined);
+  }, [eventId, navigate, sessionToken]);
 
   // 問題が切り替わったら選択状態をリセットする
   useEffect(() => {
@@ -69,6 +89,11 @@ export default function Play() {
       }
     } catch (err) {
       if (err instanceof ApiError) {
+        if (isInvalidParticipantError(err)) {
+          clearParticipantSession(eventId);
+          navigate(`/join/${eventId}`, { replace: true });
+          return;
+        }
         setResultMessage(err.message);
       } else {
         setResultMessage("通信エラーが発生しました");

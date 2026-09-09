@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
-import { getParticipantSession, setParticipantSession } from "../participantSession";
+import { clearParticipantSession, getParticipantSession, setParticipantSession, validateParticipantSession } from "../participantSession";
 import { EventSummary } from "../types";
 
 interface JoinResponseLikeLocal {
@@ -23,14 +23,29 @@ export default function Join() {
     if (!eventId) return;
     // 既にこの端末でこの大会に参加済みの場合はそのまま回答画面へ
     const existing = getParticipantSession(eventId);
-    if (existing) {
-      navigate(`/play/${eventId}`, { replace: true });
+    const loadEvent = () =>
+      api
+        .get<EventSummary>(`/api/events/${eventId}`)
+        .then(setEvent)
+        .catch((err) => setError(err.message));
+
+    if (!existing) {
+      loadEvent();
       return;
     }
-    api
-      .get<EventSummary>(`/api/events/${eventId}`)
-      .then(setEvent)
-      .catch((err) => setError(err.message));
+
+    validateParticipantSession(eventId, existing)
+      .then((valid) => {
+        if (valid) {
+          navigate(`/play/${eventId}`, { replace: true });
+          return;
+        }
+        clearParticipantSession(eventId);
+        loadEvent();
+      })
+      .catch((err) => {
+        setError(err.message);
+      });
   }, [eventId, navigate]);
 
   async function handleSubmit(e: FormEvent) {

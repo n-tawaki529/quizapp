@@ -3,7 +3,24 @@ export const API_BASE: string =
 
 export const WS_BASE: string = API_BASE.replace(/^http/, "ws");
 
-export class ApiError extends Error {}
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+
+  constructor(message: string, status = 0, code?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
+export function isInvalidParticipantError(error: unknown): error is ApiError {
+  return (
+    error instanceof ApiError &&
+    (error.code === "PARTICIPANT_NOT_FOUND" || error.status === 401 || error.status === 403)
+  );
+}
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -15,13 +32,19 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   });
   if (!res.ok) {
     let detail = res.statusText;
+    let code: string | undefined;
     try {
       const data = await res.json();
-      detail = data.detail || detail;
+      if (typeof data.detail === "object" && data.detail !== null) {
+        detail = data.detail.message || detail;
+        code = data.detail.code;
+      } else {
+        detail = data.detail || detail;
+      }
     } catch {
       /* ignore */
     }
-    throw new ApiError(detail);
+    throw new ApiError(detail, res.status, code);
   }
   if (res.status === 204) return null as unknown as T;
   return (await res.json()) as T;
@@ -54,6 +77,11 @@ export const api = {
 };
 
 export const participantApi = {
+  get: <T,>(path: string, token: string) =>
+    request<T>(path, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+    }),
   post: <T,>(path: string, body: unknown, token: string) =>
     request<T>(path, {
       method: "POST",

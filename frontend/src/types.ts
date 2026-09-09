@@ -102,6 +102,7 @@ export interface ParticipantState {
   remaining_ms: number | null;
   server_time: string;
   question: ParticipantQuestionState | null;
+  participant_valid?: boolean;
   already_answered: boolean;
   correct_count: number;
 }
