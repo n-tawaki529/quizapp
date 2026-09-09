@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ApiError, isInvalidParticipantError, participantApi } from "../api";
+import { isInvalidParticipantError, participantApi } from "../api";
 import { useEventSocket } from "../useEventSocket";
 import { useCountdown } from "../useCountdown";
 import { clearParticipantSession, getParticipantSession, validateParticipantSession } from "../participantSession";
@@ -88,16 +88,12 @@ export default function Play() {
         setLocked(true);
       }
     } catch (err) {
-      if (err instanceof ApiError) {
-        if (isInvalidParticipantError(err)) {
-          clearParticipantSession(eventId);
-          navigate(`/join/${eventId}`, { replace: true });
-          return;
-        }
-        setResultMessage(err.message);
-      } else {
-        setResultMessage("通信エラーが発生しました");
+      if (isInvalidParticipantError(err)) {
+        clearParticipantSession(eventId);
+        navigate(`/join/${eventId}`, { replace: true });
+        return;
       }
+      setResultMessage(err instanceof Error ? err.message : "通信エラーが発生しました");
     } finally {
       setSubmitting(false);
     }
