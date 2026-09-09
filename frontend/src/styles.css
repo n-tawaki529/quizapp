@@ -154,6 +154,14 @@ th, td {
   gap: 12px;
 }
 
+.participant-status-row {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .question-text {
   font-size: 18px;
   font-weight: 700;
@@ -234,9 +242,6 @@ th, td {
 }
 
 .conn-indicator {
-  position: fixed;
-  top: 8px;
-  right: 8px;
   padding: 3px 10px;
   border-radius: 999px;
   font-size: 12px;

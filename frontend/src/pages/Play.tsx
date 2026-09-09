@@ -84,11 +84,12 @@ export default function Play() {
 
   return (
     <div className="participant-screen">
-      <span className={`conn-indicator ${connected ? "conn-ok" : "conn-bad"}`}>
-        {connected ? "接続中" : "再接続中..."}
-      </span>
-      <p style={{ color: "#6b7280", fontSize: 13 }}>{session.name} さんとして参加中</p>
-      <p className="correct-count-display">現在の正解数：{state?.correct_count ?? 0}問</p>
+      <div className="participant-status-row">
+        <p className="correct-count-display">現在の正解数：{state?.correct_count ?? 0}問</p>
+        <span className={`conn-indicator ${connected ? "conn-ok" : "conn-bad"}`}>
+          {connected ? "接続中" : "再接続中..."}
+        </span>
+      </div>
 
       {state?.question ? (
         <p className="question-text">
