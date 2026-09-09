@@ -1,6 +1,7 @@
 export type EventStatus = "CREATED" | "WAITING" | "RUNNING" | "FINISHED";
 export type QuizPhase =
   | "NOT_STARTED"
+  | "QUESTION_TRANSITION"
   | "QUESTION_SHOWN"
   | "ANSWER_OPEN"
   | "ANSWER_CLOSED"
@@ -76,6 +77,8 @@ export interface MonitorState {
   remaining_ms: number | null;
   server_time: string;
   question: MonitorQuestionState | null;
+  transition_question_number: number | null;
+  transition_is_practice: boolean | null;
   ranking: RankingEntry[] | null;
   answer_counts: Partial<Record<ChoiceKey, number>> | null;
   correct_choice: ChoiceKey | null;
@@ -102,6 +105,8 @@ export interface ParticipantState {
   remaining_ms: number | null;
   server_time: string;
   question: ParticipantQuestionState | null;
+  transition_question_number: number | null;
+  transition_is_practice: boolean | null;
   participant_valid?: boolean;
   already_answered: boolean;
   correct_count: number;

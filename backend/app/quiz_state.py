@@ -131,7 +131,7 @@ def build_choice_out(choice) -> dict:
     }
 
 
-def build_monitor_state(db: Session, event: Event) -> dict:
+def build_monitor_state(db: Session, event: Event, include_question_details: bool = False) -> dict:
     question = None
     if event.current_question_id:
         question = db.get(Question, event.current_question_id)
@@ -156,18 +156,23 @@ def build_monitor_state(db: Session, event: Event) -> dict:
         "ranking": None,
         "answer_counts": None,
         "correct_choice": None,
+        "transition_question_number": None,
+        "transition_is_practice": None,
     }
     if question:
-        state["question"] = {
-            "id": str(question.id),
-            "question_number": question.question_number,
-            "question_text": question.question_text,
-            "question_media_type": question.question_media_type.value,
-            "question_media_url": question.question_media_url,
-            "time_limit_seconds": question.time_limit_seconds,
-            "choices": [build_choice_out(c) for c in question.choices],
-            "is_practice": question.is_practice,
-        }
+        state["transition_question_number"] = question.question_number
+        state["transition_is_practice"] = question.is_practice
+        if event.phase != QuizPhase.QUESTION_TRANSITION or include_question_details:
+            state["question"] = {
+                "id": str(question.id),
+                "question_number": question.question_number,
+                "question_text": question.question_text,
+                "question_media_type": question.question_media_type.value,
+                "question_media_url": question.question_media_url,
+                "time_limit_seconds": question.time_limit_seconds,
+                "choices": [build_choice_out(c) for c in question.choices],
+                "is_practice": question.is_practice,
+            }
         if event.phase.value in ("ANSWER_COUNT_SHOWN", "CORRECT_ANSWER_SHOWN"):
             state["answer_counts"] = compute_answer_counts(db, question.id)
         if event.phase.value == "CORRECT_ANSWER_SHOWN":
@@ -210,22 +215,27 @@ def build_participant_state(db: Session, event: Event, participant_id: UUID | No
         "participant_valid": participant_id is not None and db.get(Participant, participant_id) is not None,
         "already_answered": already_answered,
         "correct_count": compute_participant_correct_count(db, event, participant_id),
+        "transition_question_number": None,
+        "transition_is_practice": None,
     }
     if question:
-        state["question"] = {
-            "id": str(question.id),
-            "question_number": question.question_number,
-            "question_text": question.question_text,
-            "choice_keys": [c.choice_key.value for c in question.choices],
-            "is_practice": question.is_practice,
-        }
+        state["transition_question_number"] = question.question_number
+        state["transition_is_practice"] = question.is_practice
+        if event.phase != QuizPhase.QUESTION_TRANSITION:
+            state["question"] = {
+                "id": str(question.id),
+                "question_number": question.question_number,
+                "question_text": question.question_text,
+                "choice_keys": [c.choice_key.value for c in question.choices],
+                "is_practice": question.is_practice,
+            }
     return state
 
 
 def build_admin_state(db: Session, event: Event) -> dict:
     from .ws_manager import manager
 
-    state = build_monitor_state(db, event)
+    state = build_monitor_state(db, event, include_question_details=True)
     state["role"] = "admin"
     state["participant_count"] = db.query(Participant).filter(Participant.event_id == event.id).count()
     answered_count = 0

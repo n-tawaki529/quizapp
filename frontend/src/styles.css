@@ -655,6 +655,23 @@ th, td {
   margin: 0;
 }
 
+.monitor-transition {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.monitor-transition-title {
+  margin: 0;
+  color: #16215c;
+  font-size: 180px;
+  font-weight: 900;
+  line-height: 1;
+  text-align: center;
+}
+
 /* ランキング画面: 順位・参加者名・正解数・回答時間合計を横並びの帯として表示する。
    各セグメントは同一行内で継ぎ目なく繋がるよう、行コンテナ側の border-radius + overflow:hidden で
    角丸をまとめて処理し、個々のセグメントには角丸を付けない。 */

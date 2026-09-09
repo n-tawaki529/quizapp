@@ -8,6 +8,7 @@ import QuestionForm from "./QuestionForm";
 
 const PHASE_LABEL: Record<string, string> = {
   NOT_STARTED: "未開始",
+  QUESTION_TRANSITION: "問題切替",
   QUESTION_SHOWN: "回答待機中",
   ANSWER_OPEN: "回答受付中",
   ANSWER_CLOSED: "回答受付終了",
@@ -297,6 +298,30 @@ export default function AdminEvent() {
           )}
 
           <div className="row">
+            <button
+              className="btn"
+              disabled={busy || state?.phase !== "QUESTION_TRANSITION"}
+              onClick={() =>
+                runAction(
+                  () => adminApi.post(`/api/admin/events/${eventId}/show-question`),
+                  "問題内容を会場モニターに表示します。よろしいですか?"
+                )
+              }
+            >
+              問題を表示
+            </button>
+            <button
+              className="btn"
+              disabled={busy || state?.phase !== "QUESTION_TRANSITION"}
+              onClick={() =>
+                runAction(
+                  () => adminApi.post(`/api/admin/events/${eventId}/show-question-and-start-answer`),
+                  "問題を表示して回答受付を開始します。よろしいですか?"
+                )
+              }
+            >
+              問題を表示＋回答開始
+            </button>
             <button
               className="btn"
               disabled={busy}

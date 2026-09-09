@@ -43,6 +43,20 @@ export default function Monitor() {
     );
   }
 
+  if (state.phase === "QUESTION_TRANSITION") {
+    let title = "";
+    if (state.transition_is_practice) {
+      title = "練習問題";
+    } else if (state.transition_question_number !== null) {
+      title = `第${state.transition_question_number}問`;
+    }
+    return renderCanvas(
+      <div className="monitor-transition">
+        <h1 className="monitor-transition-title">{title}</h1>
+      </div>,
+    );
+  }
+
   const q = state.question;
   // Choiceの content_type が全てTEXTなら文章問題(縦並び)、それ以外は選択肢数別のグリッドにする。
   const isMediaChoices = !!q && q.choices.some((c) => c.content_type !== "TEXT");

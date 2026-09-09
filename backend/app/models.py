@@ -23,6 +23,7 @@ class EventStatus(str, enum.Enum):
 
 class QuizPhase(str, enum.Enum):
     NOT_STARTED = "NOT_STARTED"        # まだ問題が出題されていない
+    QUESTION_TRANSITION = "QUESTION_TRANSITION"
     QUESTION_SHOWN = "QUESTION_SHOWN"  # 問題表示中、回答受付前
     ANSWER_OPEN = "ANSWER_OPEN"        # 回答受付中
     ANSWER_CLOSED = "ANSWER_CLOSED"    # 回答受付終了(まだ結果は見せない)

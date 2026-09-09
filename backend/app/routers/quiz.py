@@ -64,7 +64,7 @@ async def _auto_close_after_deadline(event_id: UUID, question_id: UUID, deadline
 
 # ---------------- 管理者: クイズ進行操作 ----------------
 def _advance_to_next_question(db: Session, event: Event) -> Question:
-    """次の問題を表示状態にする(回答受付はまだ開始しない)。次の問題がなければ422を送出する。"""
+    """次の問題を切替状態にする(回答受付はまだ開始しない)。次の問題がなければ422を送出する。"""
     current_number = 0
     if event.current_question_id:
         current_q = db.get(Question, event.current_question_id)
@@ -85,12 +85,25 @@ def _advance_to_next_question(db: Session, event: Event) -> Question:
         raise HTTPException(status_code=422, detail="次の問題はありません")
 
     event.current_question_id = next_q.id
-    event.phase = QuizPhase.QUESTION_SHOWN
+    event.phase = QuizPhase.QUESTION_TRANSITION
     event.answer_started_at = None
     event.answer_deadline = None
     if event.status == EventStatus.CREATED:
         event.status = EventStatus.RUNNING
     return next_q
+
+
+@router.post("/api/admin/events/{event_id}/show-question")
+def show_question(event_id: UUID, db: Session = Depends(get_db), _admin=Depends(require_admin)):
+    event = _get_event_or_404(db, event_id)
+    if event.phase != QuizPhase.QUESTION_TRANSITION:
+        raise HTTPException(status_code=422, detail="問題を表示できる状態ではありません")
+    event.phase = QuizPhase.QUESTION_SHOWN
+    db.commit()
+    db.refresh(event)
+
+    _broadcast_current_state(db, event)
+    return {"ok": True}
 
 
 def _open_answer_window(event: Event, question: Question) -> None:
@@ -99,6 +112,14 @@ def _open_answer_window(event: Event, question: Question) -> None:
     event.answer_started_at = now
     event.answer_deadline = now + timedelta(seconds=question.time_limit_seconds)
     event.phase = QuizPhase.ANSWER_OPEN
+
+
+def _commit_answer_start(db: Session, event: Event, question: Question) -> None:
+    db.commit()
+    db.refresh(event)
+
+    _broadcast_current_state(db, event)
+    manager.schedule_sync(_auto_close_after_deadline(event.id, question.id, event.answer_deadline))
 
 
 @router.post("/api/admin/events/{event_id}/next")
@@ -122,11 +143,23 @@ def start_answer(event_id: UUID, db: Session = Depends(get_db), _admin=Depends(r
 
     question = db.get(Question, event.current_question_id)
     _open_answer_window(event, question)
-    db.commit()
-    db.refresh(event)
+    _commit_answer_start(db, event, question)
+    return {"ok": True}
 
-    _broadcast_current_state(db, event)
-    manager.schedule_sync(_auto_close_after_deadline(event.id, question.id, event.answer_deadline))
+
+@router.post("/api/admin/events/{event_id}/show-question-and-start-answer")
+def show_question_and_start_answer(
+    event_id: UUID, db: Session = Depends(get_db), _admin=Depends(require_admin)
+):
+    event = _get_event_or_404(db, event_id)
+    if event.current_question_id is None:
+        raise HTTPException(status_code=422, detail="表示中の問題がありません")
+    if event.phase != QuizPhase.QUESTION_TRANSITION:
+        raise HTTPException(status_code=422, detail="問題を表示して回答受付を開始できる状態ではありません")
+
+    question = db.get(Question, event.current_question_id)
+    _open_answer_window(event, question)
+    _commit_answer_start(db, event, question)
     return {"ok": True}
 
 
@@ -136,11 +169,7 @@ def next_and_start_answer(event_id: UUID, db: Session = Depends(get_db), _admin=
     event = _get_event_or_404(db, event_id)
     next_q = _advance_to_next_question(db, event)
     _open_answer_window(event, next_q)
-    db.commit()
-    db.refresh(event)
-
-    _broadcast_current_state(db, event)
-    manager.schedule_sync(_auto_close_after_deadline(event.id, next_q.id, event.answer_deadline))
+    _commit_answer_start(db, event, next_q)
     return {"ok": True}
 
 

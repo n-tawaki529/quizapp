@@ -53,7 +53,7 @@ def _ensure_quiz_phase_enum_values() -> None:
     """
     with engine.connect() as conn:
         conn = conn.execution_options(isolation_level="AUTOCOMMIT")
-        for value in ("ANSWER_COUNT_SHOWN", "CORRECT_ANSWER_SHOWN"):
+        for value in ("QUESTION_TRANSITION", "ANSWER_COUNT_SHOWN", "CORRECT_ANSWER_SHOWN"):
             conn.execute(text(f"ALTER TYPE quiz_phase ADD VALUE IF NOT EXISTS '{value}'"))
 
 
