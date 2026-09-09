@@ -77,7 +77,7 @@ export interface MonitorState {
   server_time: string;
   question: MonitorQuestionState | null;
   ranking: RankingEntry[] | null;
-  answer_counts: Record<ChoiceKey, number> | null;
+  answer_counts: Partial<Record<ChoiceKey, number>> | null;
   correct_choice: ChoiceKey | null;
   participant_count?: number;
   answered_count?: number;

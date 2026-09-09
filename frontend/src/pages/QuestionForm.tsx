@@ -10,6 +10,8 @@ interface ChoiceFormState {
   media_url: string;
 }
 
+type ChoiceCount = 2 | 3 | 4;
+
 interface Props {
   eventId: string;
   initial?: QuestionAdminOut | null;
@@ -52,6 +54,9 @@ export default function QuestionForm({
   const [questionMediaType, setQuestionMediaType] = useState<MediaType>(initial?.question_media_type ?? "NONE");
   const [questionMediaUrl, setQuestionMediaUrl] = useState(initial?.question_media_url ?? "");
   const [timeLimit, setTimeLimit] = useState(initial?.time_limit_seconds ?? 10);
+  const [choiceCount, setChoiceCount] = useState<ChoiceCount>(
+    initial && initial.choices.length >= 2 && initial.choices.length <= 4 ? (initial.choices.length as ChoiceCount) : 4,
+  );
   const [correctChoice, setCorrectChoice] = useState<ChoiceKey>(initial?.correct_choice ?? "A");
   const [choices, setChoices] = useState<Record<ChoiceKey, ChoiceFormState>>(buildInitialChoices(initial));
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +65,13 @@ export default function QuestionForm({
 
   function updateChoice(key: ChoiceKey, patch: Partial<ChoiceFormState>) {
     setChoices((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }));
+  }
+
+  function handleChoiceCountChange(value: ChoiceCount) {
+    setChoiceCount(value);
+    if (!CHOICE_KEYS.slice(0, value).includes(correctChoice)) {
+      setCorrectChoice("A");
+    }
   }
 
   async function handleQuestionMediaUpload(file: File) {
@@ -99,7 +111,7 @@ export default function QuestionForm({
         time_limit_seconds: timeLimit,
         correct_choice: correctChoice,
         is_practice: isPractice,
-        choices: CHOICE_KEYS.map((key) => ({
+        choices: CHOICE_KEYS.slice(0, choiceCount).map((key) => ({
           choice_key: key,
           content_type: choices[key].content_type,
           text: choices[key].content_type === "TEXT" ? choices[key].text : null,
@@ -164,6 +176,18 @@ export default function QuestionForm({
         <textarea rows={2} value={questionText} onChange={(e) => setQuestionText(e.target.value)} required />
       </div>
 
+      <div className="field" style={{ width: 160 }}>
+        <label>選択肢数</label>
+        <select
+          value={choiceCount}
+          onChange={(e) => handleChoiceCountChange(Number(e.target.value) as ChoiceCount)}
+        >
+          <option value={2}>2択</option>
+          <option value={3}>3択</option>
+          <option value={4}>4択</option>
+        </select>
+      </div>
+
       <div className="field">
         <label>問題に添付するメディア(任意・会場モニターのみに表示)</label>
         <select value={questionMediaType} onChange={(e) => setQuestionMediaType(e.target.value as MediaType)}>
@@ -188,8 +212,8 @@ export default function QuestionForm({
         )}
       </div>
 
-      <h4>選択肢(会場モニターにのみ内容を表示。参加者にはA〜Dのボタンのみ表示)</h4>
-      {CHOICE_KEYS.map((key) => (
+      <h4>選択肢(会場モニターにのみ内容を表示。参加者には選択肢の数に応じたボタンのみ表示)</h4>
+      {CHOICE_KEYS.slice(0, choiceCount).map((key) => (
         <div className="card" key={key} style={{ background: "#f9fafb" }}>
           <div className="row" style={{ justifyContent: "space-between" }}>
             <strong>選択肢 {key}</strong>

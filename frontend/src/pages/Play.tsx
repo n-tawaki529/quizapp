@@ -6,7 +6,6 @@ import { useCountdown } from "../useCountdown";
 import { clearParticipantSession, getParticipantSession, validateParticipantSession } from "../participantSession";
 import { ChoiceKey, ParticipantState } from "../types";
 
-const CHOICE_KEYS: ChoiceKey[] = ["A", "B", "C", "D"];
 // 会場モニターの問題表示画面と揃えた表示用ラベル(内部的な選択肢キーA〜Dはそのまま、見た目のみ1〜4)。
 const CHOICE_LABEL: Record<ChoiceKey, string> = { A: "1", B: "2", C: "3", D: "4" };
 
@@ -131,7 +130,7 @@ export default function Play() {
       </div>
 
       <div className="choice-grid">
-        {CHOICE_KEYS.map((key) => (
+        {state?.question?.choice_keys.map((key) => (
           <button
             key={key}
             className={`choice-btn choice-${key.toLowerCase()} ${selected === key ? "selected" : ""}`}

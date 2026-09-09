@@ -16,7 +16,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .models import Answer, ChoiceKey, Event, Participant, Question, QuizPhase
+from .models import Answer, Event, Participant, Question, QuizPhase
 
 
 def _iso(dt: datetime | None) -> str | None:
@@ -82,7 +82,8 @@ def compute_answer_counts(db: Session, question_id: UUID) -> dict:
     Answer テーブルには確定済みの回答のみが保存されるため(選択しただけの状態はDBに残らない)、
     このテーブルをそのまま集計すればよい。
     """
-    counts = {key.value: 0 for key in ChoiceKey}
+    question = db.get(Question, question_id)
+    counts = {choice.choice_key.value: 0 for choice in question.choices} if question else {}
     rows = (
         db.query(Answer.choice, func.count(Answer.id))
         .filter(Answer.question_id == question_id)
@@ -90,7 +91,8 @@ def compute_answer_counts(db: Session, question_id: UUID) -> dict:
         .all()
     )
     for choice, cnt in rows:
-        counts[choice.value] = int(cnt)
+        if choice.value in counts:
+            counts[choice.value] = int(cnt)
     return counts
 
 
@@ -214,7 +216,7 @@ def build_participant_state(db: Session, event: Event, participant_id: UUID | No
             "id": str(question.id),
             "question_number": question.question_number,
             "question_text": question.question_text,
-            "choice_keys": [c.value for c in ChoiceKey],
+            "choice_keys": [c.choice_key.value for c in question.choices],
             "is_practice": question.is_practice,
         }
     return state

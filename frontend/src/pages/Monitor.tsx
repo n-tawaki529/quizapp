@@ -44,14 +44,20 @@ export default function Monitor() {
   }
 
   const q = state.question;
-  // Choiceの content_type が全てTEXTなら文章問題(縦並び)、それ以外(IMAGE/VIDEO)が含まれれば
-  // 画像・動画問題(2x2)として扱う。既存のChoiceデータ構造(content_type)をそのまま利用。
+  // Choiceの content_type が全てTEXTなら文章問題(縦並び)、それ以外は選択肢数別のグリッドにする。
   const isMediaChoices = !!q && q.choices.some((c) => c.content_type !== "TEXT");
   const isImageTextChoices =
     !!q && q.question_media_type === "IMAGE" && !!q.question_media_url && q.choices.every((c) => c.content_type === "TEXT");
   let choiceLayoutClass = "monitor-choice-list-text";
-  if (isMediaChoices) choiceLayoutClass = "monitor-choice-grid-media";
-  if (isImageTextChoices) choiceLayoutClass = "monitor-choice-grid-image-text";
+  if (isMediaChoices) {
+    const choiceCount = q?.choices.length ?? 4;
+    choiceLayoutClass = choiceCount === 4 ? "monitor-choice-grid-media" : `monitor-choice-grid-media-${choiceCount}`;
+  }
+  if (isImageTextChoices) {
+    const choiceCount = q?.choices.length ?? 4;
+    choiceLayoutClass =
+      choiceCount === 4 ? "monitor-choice-grid-image-text" : `monitor-choice-grid-image-text-${choiceCount}`;
+  }
   // answer_deadline が設定されている(=一度でも回答受付を開始した)間はタイマーを表示する。
   // ANSWER_OPEN中は残り秒数、受付終了後は締切を過ぎているため useCountdown が自然に0を返す。
   // QUESTION_SHOWN(まだ回答受付前)は answer_deadline が null のため非表示のまま(既存仕様通り)。

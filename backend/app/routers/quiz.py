@@ -244,6 +244,8 @@ def submit_answer(
     question = db.get(Question, body.question_id)
     if question is None or question.event_id != event_id:
         raise HTTPException(status_code=404, detail="問題が見つかりません")
+    if not any(choice.choice_key == body.choice for choice in question.choices):
+        return AnswerResult(accepted=False, message="この問題には存在しない選択肢です")
 
     existing = (
         db.query(Answer)

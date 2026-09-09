@@ -11,7 +11,11 @@ from ..security import require_admin
 router = APIRouter(prefix="/api/admin/events/{event_id}/questions", tags=["questions"])
 
 MAX_QUESTIONS_PER_EVENT = 10
-REQUIRED_CHOICE_KEYS = {ChoiceKey.A, ChoiceKey.B, ChoiceKey.C, ChoiceKey.D}
+CHOICE_KEY_SETS = {
+    2: {ChoiceKey.A, ChoiceKey.B},
+    3: {ChoiceKey.A, ChoiceKey.B, ChoiceKey.C},
+    4: {ChoiceKey.A, ChoiceKey.B, ChoiceKey.C, ChoiceKey.D},
+}
 
 
 def _get_event_or_404(db: Session, event_id: UUID) -> Event:
@@ -21,10 +25,18 @@ def _get_event_or_404(db: Session, event_id: UUID) -> Event:
     return event
 
 
-def _validate_choices(choices: list) -> None:
+def _validate_choices(choices: list, correct_choice: ChoiceKey | None = None) -> None:
     keys = {c.choice_key for c in choices}
-    if keys != REQUIRED_CHOICE_KEYS:
-        raise HTTPException(status_code=422, detail="選択肢はA〜Dをすべて指定してください")
+    if keys != CHOICE_KEY_SETS.get(len(choices)):
+        raise HTTPException(status_code=422, detail="選択肢はA〜B、A〜C、またはA〜Dを指定してください")
+    for choice in choices:
+        if choice.content_type == "TEXT":
+            if not choice.text or not choice.text.strip():
+                raise HTTPException(status_code=422, detail=f"選択肢{choice.choice_key.value}のテキストを入力してください")
+        elif not choice.media_url or not choice.media_url.strip():
+            raise HTTPException(status_code=422, detail=f"選択肢{choice.choice_key.value}のメディアを指定してください")
+    if correct_choice is not None and correct_choice not in keys:
+        raise HTTPException(status_code=422, detail="正解は存在する選択肢から指定してください")
 
 
 @router.get("", response_model=list[QuestionAdminOut])
@@ -45,7 +57,7 @@ def create_question(
     event_id: UUID, body: QuestionCreateRequest, db: Session = Depends(get_db), _admin=Depends(require_admin)
 ):
     _get_event_or_404(db, event_id)
-    _validate_choices(body.choices)
+    _validate_choices(body.choices, body.correct_choice)
 
     count = db.query(Question).filter(Question.event_id == event_id).count()
     if count >= MAX_QUESTIONS_PER_EVENT:
@@ -157,14 +169,25 @@ def update_question(
         question.correct_choice = body.correct_choice
 
     if body.choices is not None:
-        _validate_choices(body.choices)
+        effective_correct_choice = body.correct_choice if body.correct_choice is not None else question.correct_choice
+        _validate_choices(body.choices, effective_correct_choice)
         by_key = {c.choice_key: c for c in question.choices}
+        incoming_keys = {c.choice_key for c in body.choices}
         for c in body.choices:
             target = by_key.get(c.choice_key)
             if target:
                 target.content_type = c.content_type
                 target.text = c.text
                 target.media_url = c.media_url
+            else:
+                question.choices.append(
+                    Choice(choice_key=c.choice_key, content_type=c.content_type, text=c.text, media_url=c.media_url)
+                )
+        for choice in question.choices:
+            if choice.choice_key not in incoming_keys:
+                db.delete(choice)
+    elif body.correct_choice is not None and body.correct_choice not in {c.choice_key for c in question.choices}:
+        raise HTTPException(status_code=422, detail="正解は存在する選択肢から指定してください")
 
     db.commit()
     db.refresh(question)
