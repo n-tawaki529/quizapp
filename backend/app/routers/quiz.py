@@ -309,4 +309,4 @@ def submit_answer(
         {"admin": admin_state},
     )
 
-    return AnswerResult(accepted=True, is_correct=is_correct, response_time_ms=response_time_ms)
+    return AnswerResult(accepted=True, response_time_ms=response_time_ms)

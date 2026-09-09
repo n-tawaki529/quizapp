@@ -322,6 +322,24 @@ th, td {
   visibility: hidden;
 }
 
+.feedback-accepted {
+  font-size: 24px;
+  color: #374151;
+}
+
+.feedback-correct {
+  color: #047857;
+}
+
+.feedback-incorrect {
+  color: #b91c1c;
+}
+
+.feedback-unanswered {
+  font-size: 28px;
+  color: #92400e;
+}
+
 .conn-indicator {
   padding: 3px 10px;
   border-radius: 999px;

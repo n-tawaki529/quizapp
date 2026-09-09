@@ -194,14 +194,27 @@ def build_participant_state(db: Session, event: Event, participant_id: UUID | No
     if event.phase.value == "ANSWER_OPEN" and event.answer_deadline:
         remaining_ms = max(0, int((event.answer_deadline - now).total_seconds() * 1000))
 
-    already_answered = False
+    answer = None
     if question is not None and participant_id is not None:
-        already_answered = (
+        answer = (
             db.query(Answer)
             .filter(Answer.participant_id == participant_id, Answer.question_id == question.id)
             .first()
-            is not None
         )
+    already_answered = answer is not None
+    result_visible = event.phase in (QuizPhase.CORRECT_ANSWER_SHOWN, QuizPhase.RANKING)
+    my_result = None
+    if result_visible:
+        my_result = {
+            "answered": answer is not None,
+        }
+        if answer is not None:
+            my_result.update(
+                {
+                    "choice_key": answer.choice.value,
+                    "is_correct": answer.is_correct,
+                }
+            )
 
     state = {
         "type": "state_sync",
@@ -214,6 +227,8 @@ def build_participant_state(db: Session, event: Event, participant_id: UUID | No
         "question": None,
         "participant_valid": participant_id is not None and db.get(Participant, participant_id) is not None,
         "already_answered": already_answered,
+        "my_choice": answer.choice.value if answer is not None else None,
+        "my_result": my_result,
         "correct_count": compute_participant_correct_count(db, event, participant_id),
         "transition_question_number": None,
         "transition_is_practice": None,

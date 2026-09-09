@@ -109,6 +109,12 @@ export interface ParticipantState {
   transition_is_practice: boolean | null;
   participant_valid?: boolean;
   already_answered: boolean;
+  my_choice: ChoiceKey | null;
+  my_result: {
+    answered: boolean;
+    choice_key?: ChoiceKey;
+    is_correct?: boolean;
+  } | null;
   correct_count: number;
 }
 

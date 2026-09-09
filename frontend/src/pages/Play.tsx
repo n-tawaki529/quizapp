@@ -16,7 +16,7 @@ export default function Play() {
 
   const [submitting, setSubmitting] = useState(false);
   const [selected, setSelected] = useState<ChoiceKey | null>(null);
-  const [resultMessage, setResultMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [locked, setLocked] = useState(false);
 
   useEffect(() => {
@@ -53,14 +53,10 @@ export default function Play() {
 
   // 問題が切り替わったら選択状態をリセットする
   useEffect(() => {
-    setSelected(null);
-    setResultMessage(null);
+    setSelected(state?.already_answered ? state.my_choice : null);
+    setErrorMessage(null);
     setLocked(state?.already_answered ?? false);
-  }, [state?.question?.id]);
-
-  useEffect(() => {
-    if (state?.already_answered) setLocked(true);
-  }, [state?.already_answered]);
+  }, [state?.question?.id, state?.already_answered, state?.my_choice]);
 
   if (!eventId || !session) {
     return <div className="page">読み込み中...</div>;
@@ -80,11 +76,10 @@ export default function Play() {
         session.token
       );
       if (res.accepted) {
-        setResultMessage("回答を受け付けました");
+        setErrorMessage(null);
         setLocked(true);
       } else {
-        setResultMessage(res.message || "回答を受け付けられませんでした");
-        setLocked(true);
+        setErrorMessage(res.message || "回答を受け付けられませんでした");
       }
     } catch (err) {
       if (isInvalidParticipantError(err)) {
@@ -92,7 +87,7 @@ export default function Play() {
         navigate(`/join/${eventId}`, { replace: true });
         return;
       }
-      setResultMessage(err instanceof Error ? err.message : "通信エラーが発生しました");
+      setErrorMessage(err instanceof Error ? err.message : "通信エラーが発生しました");
     } finally {
       setSubmitting(false);
     }
@@ -101,6 +96,23 @@ export default function Play() {
   const phase = state?.phase ?? "NOT_STARTED";
   const canAnswer = phase === "ANSWER_OPEN" && !locked;
   const seconds = remainingMs !== null ? Math.ceil(remainingMs / 1000) : null;
+  const feedback = (() => {
+    if (phase === "CORRECT_ANSWER_SHOWN" || phase === "RANKING") {
+      if (!state?.my_result?.answered) {
+        return { text: "未回答", className: "feedback-unanswered" };
+      }
+      return state.my_result.is_correct
+        ? { text: "○ 正解！", className: "feedback-correct" }
+        : { text: "× 不正解", className: "feedback-incorrect" };
+    }
+    if (locked && ["ANSWER_OPEN", "ANSWER_CLOSED", "ANSWER_COUNT_SHOWN"].includes(phase)) {
+      return { text: "回答を受け付けました", className: "feedback-accepted" };
+    }
+    if (phase === "ANSWER_OPEN" && seconds !== null) {
+      return { text: `残り ${seconds} 秒`, className: "" };
+    }
+    return null;
+  })();
 
   return (
     <div className="participant-screen">
@@ -124,8 +136,8 @@ export default function Play() {
       ) : null}
 
       <div className="countdown-slot">
-        <p className={`countdown${phase === "ANSWER_OPEN" && seconds !== null ? "" : " countdown-hidden"}`}>
-          {phase === "ANSWER_OPEN" && seconds !== null ? `残り ${seconds} 秒` : "\u00a0"}
+        <p className={`countdown ${feedback?.className ?? "countdown-hidden"}`}>
+          {feedback?.text ?? "\u00a0"}
         </p>
       </div>
 
@@ -142,16 +154,17 @@ export default function Play() {
         ))}
       </div>
 
-      <button
-        className="btn confirm-answer-btn"
-        disabled={!canAnswer || selected === null || submitting}
-        onClick={() => selected && handleAnswer(selected)}
-      >
-        回答する
-      </button>
+      {canAnswer && (
+        <button
+          className="btn confirm-answer-btn"
+          disabled={selected === null || submitting}
+          onClick={() => selected && handleAnswer(selected)}
+        >
+          回答する
+        </button>
+      )}
 
-      {resultMessage && <p className="status-message">{resultMessage}</p>}
-      {locked && !resultMessage && <p className="status-message">この問題は回答済みです</p>}
+      {errorMessage && <p className="status-message">{errorMessage}</p>}
     </div>
   );
 }

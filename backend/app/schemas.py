@@ -119,7 +119,6 @@ class AnswerRequest(BaseModel):
 
 class AnswerResult(BaseModel):
     accepted: bool
-    is_correct: bool | None = None
     response_time_ms: int | None = None
     message: str = ""
 
