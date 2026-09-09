@@ -98,6 +98,87 @@ a {
   align-items: center;
 }
 
+.admin-state-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0 12px;
+}
+
+.admin-state-item {
+  padding: 12px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+}
+
+.admin-state-label {
+  display: block;
+  color: #6b7280;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.admin-state-value {
+  display: block;
+  font-size: 18px;
+}
+
+.admin-state-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 16px;
+  color: #374151;
+  font-size: 14px;
+}
+
+.admin-main-action {
+  margin: 18px 0 12px;
+}
+
+.admin-main-action .btn {
+  min-width: 240px;
+  padding: 13px 22px;
+  font-size: 17px;
+}
+
+.admin-waiting-message {
+  margin: 0;
+  padding: 14px 16px;
+  border-left: 4px solid var(--color-primary);
+  background: #eff6ff;
+  font-weight: 600;
+}
+
+.admin-sub-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.admin-other-actions {
+  margin-top: 14px;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 12px;
+}
+
+.admin-other-actions summary {
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.admin-other-actions-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 .tabs {
   display: flex;
   gap: 4px;

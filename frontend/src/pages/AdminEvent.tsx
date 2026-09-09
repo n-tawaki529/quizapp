@@ -17,6 +17,32 @@ const PHASE_LABEL: Record<string, string> = {
   RANKING: "ランキング表示中",
 };
 
+function hasNextQuestion(currentQuestion: MonitorState["question"], questions: QuestionAdminOut[]) {
+  const normalQuestions = questions.filter((q) => !q.is_practice);
+  if (!currentQuestion) return questions.length > 0;
+  if (currentQuestion.is_practice) return normalQuestions.length > 0;
+  return normalQuestions.some((q) => q.question_number > currentQuestion.question_number);
+}
+
+function getNextActionLabel(phase: string, hasNext: boolean) {
+  const labels: Record<string, string> = {
+    NOT_STARTED: "次の問題へ",
+    QUESTION_TRANSITION: "問題を表示＋回答開始",
+    QUESTION_SHOWN: "回答開始",
+    ANSWER_OPEN: "回答締切待ち",
+    ANSWER_CLOSED: "回答結果を表示",
+    ANSWER_COUNT_SHOWN: "正解発表",
+    RANKING: "終了",
+  };
+  if (phase === "CORRECT_ANSWER_SHOWN") return hasNext ? "次の問題へ" : "ランキング表示";
+  return labels[phase] ?? "終了";
+}
+
+function getQuestionLabel(question: MonitorState["question"]) {
+  if (!question) return "問題未表示";
+  return question.is_practice ? "練習問題" : `第${question.question_number}問`;
+}
+
 export default function AdminEvent() {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
@@ -118,6 +144,54 @@ export default function AdminEvent() {
   const monitorUrl = `${window.location.origin}/monitor/${eventId}`;
   const practiceQuestion = questions.find((q) => q.is_practice) ?? null;
   const normalQuestions = questions.filter((q) => !q.is_practice);
+  const phase = state?.phase ?? event.phase;
+  const currentQuestion = state?.question ?? null;
+  const hasMoreQuestions = hasNextQuestion(currentQuestion, questions);
+  const nextActionLabel = getNextActionLabel(phase, hasMoreQuestions);
+  const interruptAnswerConfirm =
+    phase === "ANSWER_OPEN"
+      ? "回答受付中です。進めると現在の回答受付が中断されます。よろしいですか?"
+      : "次の問題へ進みます。よろしいですか?";
+
+  const showQuestion = () =>
+    runAction(
+      () => adminApi.post(`/api/admin/events/${eventId}/show-question`),
+      "問題内容を会場モニターに表示します。よろしいですか?"
+    );
+  const showQuestionAndStartAnswer = () =>
+    runAction(
+      () => adminApi.post(`/api/admin/events/${eventId}/show-question-and-start-answer`),
+      "問題を表示して回答受付を開始します。よろしいですか?"
+    );
+  const nextQuestion = () =>
+    runAction(() => adminApi.post(`/api/admin/events/${eventId}/next`), interruptAnswerConfirm);
+  const startAnswer = () =>
+    runAction(
+      () => adminApi.post(`/api/admin/events/${eventId}/start-answer`),
+      "回答受付を開始します。よろしいですか?"
+    );
+  const nextAndStartAnswer = () =>
+    runAction(
+      () => adminApi.post(`/api/admin/events/${eventId}/next-and-start-answer`),
+      phase === "ANSWER_OPEN"
+        ? interruptAnswerConfirm
+        : "次の問題へ進み、同時に回答受付を開始します。よろしいですか?"
+    );
+  const showAnswerCount = () =>
+    runAction(
+      () => adminApi.post(`/api/admin/events/${eventId}/show-answer-count`),
+      "回答人数を会場モニターに表示します。よろしいですか?"
+    );
+  const showCorrectAnswer = () =>
+    runAction(
+      () => adminApi.post(`/api/admin/events/${eventId}/show-correct-answer`),
+      "正解を発表します。よろしいですか?"
+    );
+  const showRanking = () =>
+    runAction(
+      () => adminApi.post(`/api/admin/events/${eventId}/show-ranking`),
+      "会場モニターをランキング表示に切り替えます。よろしいですか?"
+    );
 
   return (
     <div className="page">
@@ -266,25 +340,33 @@ export default function AdminEvent() {
               {connected ? "接続中" : "切断"}
             </span>
           </p>
-          <p style={{ fontSize: 18, fontWeight: 700 }}>
-            {state?.question
-              ? state.question.is_practice
-                ? "練習問題"
-                : `第${state.question.question_number}問`
-              : "問題未表示"}
-            ・
-            {PHASE_LABEL[state?.phase ?? ""] ?? "-"}
-          </p>
-          <p>
-            参加者数: {state?.participant_count ?? "-"} (接続中 {state?.connected_participant_count ?? "-"}) / 回答数:{" "}
-            {state?.answered_count ?? "-"}
-          </p>
+          <div className="admin-state-summary">
+            <div className="admin-state-item">
+              <span className="admin-state-label">現在の問題</span>
+              <strong className="admin-state-value">
+                {getQuestionLabel(currentQuestion)}
+              </strong>
+            </div>
+            <div className="admin-state-item">
+              <span className="admin-state-label">現在の状態</span>
+              <strong className="admin-state-value">{PHASE_LABEL[phase] ?? "-"}</strong>
+            </div>
+            <div className="admin-state-item">
+              <span className="admin-state-label">次の操作</span>
+              <strong className="admin-state-value">{nextActionLabel}</strong>
+            </div>
+          </div>
+          <div className="admin-state-counts">
+            <span>参加者数: {state?.participant_count ?? "-"}</span>
+            <span>接続中: {state?.connected_participant_count ?? "-"}</span>
+            <span>回答数: {state?.answered_count ?? "-"}</span>
+          </div>
           {state?.question && (
             <div className="card" style={{ background: "#f9fafb" }}>
               <strong>{state.question.question_text}</strong>
               {state.question.question_media_url && state.question.question_media_type === "IMAGE" && (
                 <div>
-                  <img src={mediaUrl(state.question.question_media_url)} style={{ maxWidth: 300 }} />
+                  <img alt="問題画像" src={mediaUrl(state.question.question_media_url)} style={{ maxWidth: 300 }} />
                 </div>
               )}
               <ul>
@@ -297,104 +379,52 @@ export default function AdminEvent() {
             </div>
           )}
 
-          <div className="row">
-            <button
-              className="btn"
-              disabled={busy || state?.phase !== "QUESTION_TRANSITION"}
-              onClick={() =>
-                runAction(
-                  () => adminApi.post(`/api/admin/events/${eventId}/show-question`),
-                  "問題内容を会場モニターに表示します。よろしいですか?"
-                )
-              }
-            >
-              問題を表示
-            </button>
-            <button
-              className="btn"
-              disabled={busy || state?.phase !== "QUESTION_TRANSITION"}
-              onClick={() =>
-                runAction(
-                  () => adminApi.post(`/api/admin/events/${eventId}/show-question-and-start-answer`),
-                  "問題を表示して回答受付を開始します。よろしいですか?"
-                )
-              }
-            >
-              問題を表示＋回答開始
-            </button>
-            <button
-              className="btn"
-              disabled={busy}
-              onClick={() =>
-                runAction(
-                  () => adminApi.post(`/api/admin/events/${eventId}/next`),
-                  "次の問題へ進みます。よろしいですか?"
-                )
-              }
-            >
-              次の問題へ
-            </button>
-            <button
-              className="btn"
-              disabled={busy || state?.phase !== "QUESTION_SHOWN"}
-              onClick={() =>
-                runAction(
-                  () => adminApi.post(`/api/admin/events/${eventId}/start-answer`),
-                  "回答受付を開始します。よろしいですか?"
-                )
-              }
-            >
-              回答開始
-            </button>
-            <button
-              className="btn"
-              disabled={busy}
-              onClick={() =>
-                runAction(
-                  () => adminApi.post(`/api/admin/events/${eventId}/next-and-start-answer`),
-                  "次の問題へ進み、同時に回答受付を開始します。よろしいですか?"
-                )
-              }
-            >
-              次の問題へ+回答開始
-            </button>
-            <button
-              className="btn"
-              disabled={busy || state?.phase !== "ANSWER_CLOSED"}
-              onClick={() =>
-                runAction(
-                  () => adminApi.post(`/api/admin/events/${eventId}/show-answer-count`),
-                  "回答人数を会場モニターに表示します。よろしいですか?"
-                )
-              }
-            >
-              回答結果を表示
-            </button>
-            <button
-              className="btn"
-              disabled={busy || state?.phase !== "ANSWER_COUNT_SHOWN"}
-              onClick={() =>
-                runAction(
-                  () => adminApi.post(`/api/admin/events/${eventId}/show-correct-answer`),
-                  "正解を発表します。よろしいですか?"
-                )
-              }
-            >
-              正解発表
-            </button>
-            <button
-              className="btn"
-              disabled={busy}
-              onClick={() =>
-                runAction(
-                  () => adminApi.post(`/api/admin/events/${eventId}/show-ranking`),
-                  "会場モニターをランキング表示に切り替えます。よろしいですか?"
-                )
-              }
-            >
-              ランキング表示
-            </button>
+          <div className="admin-main-action">
+            {phase === "NOT_STARTED" && <button className="btn" disabled={busy} onClick={nextQuestion}>次の問題へ</button>}
+            {phase === "QUESTION_TRANSITION" && (
+              <button className="btn" disabled={busy} onClick={showQuestionAndStartAnswer}>問題を表示＋回答開始</button>
+            )}
+            {phase === "QUESTION_SHOWN" && <button className="btn" disabled={busy} onClick={startAnswer}>回答開始</button>}
+            {phase === "ANSWER_OPEN" && <p className="admin-waiting-message">回答受付中です。制限時間終了後に自動で締め切ります。</p>}
+            {phase === "ANSWER_CLOSED" && <button className="btn" disabled={busy} onClick={showAnswerCount}>回答結果を表示</button>}
+            {phase === "ANSWER_COUNT_SHOWN" && <button className="btn" disabled={busy} onClick={showCorrectAnswer}>正解発表</button>}
+            {phase === "CORRECT_ANSWER_SHOWN" && (
+              hasMoreQuestions ? <button className="btn" disabled={busy} onClick={nextQuestion}>次の問題へ</button> :
+                <button className="btn" disabled={busy} onClick={showRanking}>ランキング表示</button>
+            )}
           </div>
+
+          {phase === "QUESTION_TRANSITION" && (
+            <div className="admin-sub-actions">
+              <span>補助操作</span>
+              <button className="btn secondary" disabled={busy} onClick={showQuestion}>問題を表示</button>
+            </div>
+          )}
+
+          <details className="admin-other-actions">
+            <summary>その他の操作</summary>
+            <div className="admin-other-actions-list">
+              {phase !== "NOT_STARTED" && phase !== "CORRECT_ANSWER_SHOWN" && (
+                <button className="btn secondary" disabled={busy} onClick={nextQuestion}>次の問題へ</button>
+              )}
+              {phase !== "QUESTION_TRANSITION" && (
+                <button className="btn secondary" disabled={busy} onClick={showQuestionAndStartAnswer}>問題を表示＋回答開始</button>
+              )}
+              {phase !== "QUESTION_SHOWN" && (
+                <button className="btn secondary" disabled={busy} onClick={startAnswer}>回答開始</button>
+              )}
+              <button className="btn secondary" disabled={busy} onClick={nextAndStartAnswer}>次の問題へ+回答開始</button>
+              {phase !== "ANSWER_CLOSED" && (
+                <button className="btn secondary" disabled={busy} onClick={showAnswerCount}>回答結果を表示</button>
+              )}
+              {phase !== "ANSWER_COUNT_SHOWN" && (
+                <button className="btn secondary" disabled={busy} onClick={showCorrectAnswer}>正解発表</button>
+              )}
+              {(phase !== "CORRECT_ANSWER_SHOWN" || hasMoreQuestions) && (
+                <button className="btn secondary" disabled={busy} onClick={showRanking}>ランキング表示</button>
+              )}
+            </div>
+          </details>
 
           {state?.phase === "RANKING" && state.ranking && (
             <table style={{ marginTop: 16 }}>
