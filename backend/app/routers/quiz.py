@@ -272,17 +272,10 @@ def submit_answer(
         db.rollback()
         return AnswerResult(accepted=False, message="既に回答済みです")
 
-    answered_count = db.query(Answer).filter(Answer.question_id == body.question_id).count()
-    participant_count = db.query(Participant).filter(Participant.event_id == event_id).count()
+    admin_state = build_admin_state(db, event)
     manager.broadcast_all_sync(
         str(event_id),
-        {
-            "admin": {
-                "type": "answer_count_update",
-                "answered_count": answered_count,
-                "participant_count": participant_count,
-            }
-        },
+        {"admin": admin_state},
     )
 
     return AnswerResult(accepted=True, is_correct=is_correct, response_time_ms=response_time_ms)
