@@ -10,15 +10,6 @@ const CHOICE_KEYS: ChoiceKey[] = ["A", "B", "C", "D"];
 // 会場モニターの問題表示画面と揃えた表示用ラベル(内部的な選択肢キーA〜Dはそのまま、見た目のみ1〜4)。
 const CHOICE_LABEL: Record<ChoiceKey, string> = { A: "1", B: "2", C: "3", D: "4" };
 
-const PHASE_MESSAGE: Record<string, string> = {
-  NOT_STARTED: "まもなく大会が始まります。しばらくお待ちください。",
-  QUESTION_SHOWN: "会場モニターの問題をご覧ください。まもなく回答が開始されます。",
-  ANSWER_CLOSED: "回答受付は終了しました。結果をお待ちください。",
-  ANSWER_COUNT_SHOWN: "回答結果発表中です。会場モニターをご覧ください。",
-  CORRECT_ANSWER_SHOWN: "正解発表中です。会場モニターをご覧ください。",
-  RANKING: "ランキング発表中です。会場モニターをご覧ください。",
-};
-
 export default function Play() {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
@@ -109,11 +100,13 @@ export default function Play() {
           <br />
           {state.question.question_text}
         </p>
-      ) : (
-        <p className="question-text">クイズ開始をお待ちください</p>
-      )}
+      ) : null}
 
-      {phase === "ANSWER_OPEN" && seconds !== null && <p className="countdown">残り {seconds} 秒</p>}
+      <div className="countdown-slot">
+        <p className={`countdown${phase === "ANSWER_OPEN" && seconds !== null ? "" : " countdown-hidden"}`}>
+          {phase === "ANSWER_OPEN" && seconds !== null ? `残り ${seconds} 秒` : "\u00a0"}
+        </p>
+      </div>
 
       <div className="choice-grid">
         {CHOICE_KEYS.map((key) => (
@@ -137,7 +130,6 @@ export default function Play() {
       </button>
 
       {resultMessage && <p className="status-message">{resultMessage}</p>}
-      {!resultMessage && PHASE_MESSAGE[phase] && <p className="status-message">{PHASE_MESSAGE[phase]}</p>}
       {locked && !resultMessage && <p className="status-message">この問題は回答済みです</p>}
     </div>
   );

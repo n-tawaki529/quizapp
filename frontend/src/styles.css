@@ -145,19 +145,21 @@ th, td {
 /* ---------- 参加者(スマートフォン)画面 ---------- */
 .participant-screen {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding: 24px 16px;
-  gap: 20px;
+  padding: 16px 16px;
+  gap: 12px;
 }
 
 .question-text {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
   text-align: center;
-  line-height: 1.5;
+  line-height: 1.35;
+  margin: 0;
 }
 
 .choice-grid {
@@ -165,11 +167,11 @@ th, td {
   max-width: 420px;
   display: grid;
   grid-template-columns: 1fr;
-  gap: 14px;
+  gap: 10px;
 }
 
 .choice-btn {
-  padding: 26px 10px;
+  padding: 18px 10px;
   font-size: 30px;
   font-weight: 800;
   border-radius: 16px;
@@ -195,7 +197,7 @@ th, td {
 .confirm-answer-btn {
   width: 100%;
   max-width: 420px;
-  padding: 18px 10px;
+  padding: 14px 10px;
   font-size: 22px;
   font-weight: 800;
   border-radius: 16px;
@@ -209,12 +211,26 @@ th, td {
   font-size: 16px;
   color: #374151;
   text-align: center;
+  margin: 0;
 }
 
 .countdown {
-  font-size: 48px;
+  font-size: 40px;
   font-weight: 800;
   color: var(--color-primary);
+  margin: 0;
+  line-height: 1.35;
+}
+
+.countdown-slot {
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.countdown-hidden {
+  visibility: hidden;
 }
 
 .conn-indicator {
@@ -231,12 +247,13 @@ th, td {
 .conn-bad { background: #fee2e2; color: #991b1b; }
 
 .correct-count-display {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
   color: #1f2937;
   background: #f3f4f6;
   border-radius: 10px;
-  padding: 6px 14px;
+  padding: 4px 10px;
+  margin: 0;
   display: inline-block;
 }
 
@@ -251,12 +268,23 @@ th, td {
 }
 
 /* ---------- 会場モニター画面 ---------- */
-.monitor-screen {
+.monitor-viewport {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #000;
+}
+
+.monitor-canvas {
   /* min-heightだと画面がビューポートより高く伸びてしまい、内部の height:100% /
      max-height:100% (画像・動画等) が確定した高さを基準にできず、はみ出しの原因になる。
      16:9モニター表示は常にビューポート1画面に収める想定のため height で固定する。 */
-  height: 100vh;
-  width: 100vw;
+  height: 1080px;
+  width: 1920px;
+  flex-shrink: 0;
   /* 上:鮮やかなオレンジ → 中央:淡いオレンジ → 下:白に近いクリーム色 */
   background: linear-gradient(180deg, #ff7e1a 0%, #ffb877 42%, #fff8ec 100%);
   color: #3b0764;
@@ -287,8 +315,8 @@ th, td {
 }
 
 .monitor-media {
-  max-width: 60vw;
-  max-height: 22vh;
+  max-width: 1152px;
+  max-height: 238px;
   border-radius: 12px;
 }
 
@@ -316,6 +344,27 @@ th, td {
   min-height: 0;
 }
 
+.monitor-choices-area-image-text {
+  justify-content: space-between;
+}
+
+.monitor-image-text-media-frame {
+  flex: 0 0 calc(60% - 40px);
+  width: 100%;
+  min-height: 0;
+  margin-bottom: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.monitor-image-text-media {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
 /* 文章問題: 4択を縦方向に配置 */
 .monitor-choice-list-text {
   display: flex;
@@ -332,6 +381,20 @@ th, td {
   gap: 22px;
   width: 100%;
   height: 100%;
+}
+
+.monitor-choice-grid-image-text {
+  flex: 0 0 280px;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 26px 22px;
+  width: 100%;
+}
+
+.monitor-choice-grid-image-text .text-card {
+  min-height: 0;
 }
 
 .monitor-choice-card {
@@ -511,7 +574,7 @@ th, td {
 .monitor-qpanel-text p {
   writing-mode: vertical-rl;
   text-orientation: upright;
-  font-size: 28px;
+  font-size: 42px;
   font-weight: 800;
   /* 背景は薄紫→濃紺のグラデーションのため、濃紺側で暗い文字色が同化して読みにくかった。
      白文字+濃色の縁取りにして、グラデーションのどの位置でも視認できるようにする。 */
@@ -565,7 +628,7 @@ th, td {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  width: min(1100px, 92vw);
+  width: 1100px;
   max-height: 100%;
   overflow: hidden;
 }

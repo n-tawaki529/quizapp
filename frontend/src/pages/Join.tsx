@@ -64,7 +64,7 @@ export default function Join() {
           </button>
         </form>
         <p style={{ fontSize: 13, color: "#6b7280", marginTop: 12 }}>
-          ※ 同じ名前でも参加者ごとに別のIDで管理されます。
+          ※ 入力した名前はランキングに表示される場合があります。
         </p>
       </div>
     </div>
