@@ -72,6 +72,7 @@ class Event(Base):
     )
     answer_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     answer_deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    ranking_reveal_rank: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 

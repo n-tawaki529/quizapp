@@ -43,6 +43,24 @@ function getQuestionLabel(question: MonitorState["question"]) {
   return question.is_practice ? "練習問題" : `第${question.question_number}問`;
 }
 
+function getRankingRevealActionLabel(rank: number | null) {
+  if (rank === null) return "最初の順位を表示";
+  if (rank === 1) return "最終ランキングを表示";
+  return "次の順位を表示";
+}
+
+function getRankingRevealNextLabel(rank: number | null) {
+  if (rank === null) return "最初の順位を表示";
+  if (rank === 1) return "最終ランキングを表示";
+  return `第${rank - 1}位を表示`;
+}
+
+function getRankingRevealStatus(rank: number | null) {
+  if (rank === null) return "ランキング発表の開始待ちです。";
+  if (rank === 1) return "現在: 第1位を表示中 / 次: 最終ランキング";
+  return `現在: 第${rank}位を表示中 / 次: 第${rank - 1}位`;
+}
+
 export default function AdminEvent() {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
@@ -147,7 +165,10 @@ export default function AdminEvent() {
   const phase = state?.phase ?? event.phase;
   const currentQuestion = state?.question ?? null;
   const hasMoreQuestions = hasNextQuestion(currentQuestion, questions);
-  const nextActionLabel = getNextActionLabel(phase, hasMoreQuestions);
+  const rankingRevealRank = state?.ranking_reveal_rank ?? null;
+  const nextActionLabel = phase === "RANKING"
+    ? getRankingRevealNextLabel(rankingRevealRank)
+    : getNextActionLabel(phase, hasMoreQuestions);
   const interruptAnswerConfirm =
     phase === "ANSWER_OPEN"
       ? "回答受付中です。進めると現在の回答受付が中断されます。よろしいですか?"
@@ -192,6 +213,8 @@ export default function AdminEvent() {
       () => adminApi.post(`/api/admin/events/${eventId}/show-ranking`),
       "会場モニターをランキング表示に切り替えます。よろしいですか?"
     );
+  const showNextRankingReveal = () =>
+    runAction(() => adminApi.post(`/api/admin/events/${eventId}/ranking-reveal-next`));
 
   return (
     <div className="page">
@@ -392,7 +415,18 @@ export default function AdminEvent() {
               hasMoreQuestions ? <button className="btn" disabled={busy} onClick={nextQuestion}>次の問題へ</button> :
                 <button className="btn" disabled={busy} onClick={showRanking}>ランキング表示</button>
             )}
+            {phase === "RANKING" && rankingRevealRank !== 0 && (
+              <button className="btn" disabled={busy} onClick={showNextRankingReveal}>
+                {getRankingRevealActionLabel(rankingRevealRank)}
+              </button>
+            )}
           </div>
+
+          {phase === "RANKING" && rankingRevealRank !== 0 && (
+            <p className="admin-waiting-message">
+              {getRankingRevealStatus(rankingRevealRank)}
+            </p>
+          )}
 
           {phase === "QUESTION_TRANSITION" && (
             <div className="admin-sub-actions">

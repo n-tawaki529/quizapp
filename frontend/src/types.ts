@@ -80,6 +80,7 @@ export interface MonitorState {
   transition_question_number: number | null;
   transition_is_practice: boolean | null;
   ranking: RankingEntry[] | null;
+  ranking_reveal_rank: number | null;
   answer_counts: Partial<Record<ChoiceKey, number>> | null;
   correct_choice: ChoiceKey | null;
   participant_count?: number;

@@ -15,18 +15,39 @@ function formatDuration(ms: number): string {
 }
 
 interface Props {
-  entry: RankingEntry;
+  readonly entry: RankingEntry;
+  readonly revealed: boolean;
+  readonly highlighted: boolean;
 }
 
-function RankingRow({ entry }: Props) {
+function RankingRow({ entry, revealed, highlighted }: Props) {
+  const isFirst = revealed && entry.rank === 1;
+  const rowClassName = [
+    "monitor-ranking-row",
+    revealed ? "is-revealed" : "is-hidden",
+    highlighted ? "is-highlighted" : "",
+    isFirst ? "is-first" : "",
+    isFirst && highlighted ? "is-winner-reveal" : "",
+  ].filter(Boolean).join(" ");
+
   return (
-    <div className="monitor-ranking-row">
+    <div className={rowClassName}>
       <span className="monitor-ranking-rank">{entry.rank}</span>
-      <span className="monitor-ranking-name" title={entry.name}>
-        {entry.name}
-      </span>
-      <span className="monitor-ranking-correct">{entry.correct_count}問</span>
-      <span className="monitor-ranking-time">{formatDuration(entry.total_response_time_ms)}</span>
+      {revealed ? (
+        <>
+          <span className="monitor-ranking-name" title={entry.name}>
+            {entry.name}
+          </span>
+          <span className="monitor-ranking-correct">{entry.correct_count}問</span>
+          <span className="monitor-ranking-time">{formatDuration(entry.total_response_time_ms)}</span>
+        </>
+      ) : (
+        <>
+          <span className="monitor-ranking-name" />
+          <span className="monitor-ranking-correct" />
+          <span className="monitor-ranking-time" />
+        </>
+      )}
     </div>
   );
 }

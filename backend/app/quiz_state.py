@@ -17,6 +17,10 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .models import Answer, Event, Participant, Question, QuizPhase
+from .config import get_settings
+
+
+settings = get_settings()
 
 
 def _iso(dt: datetime | None) -> str | None:
@@ -154,6 +158,7 @@ def build_monitor_state(db: Session, event: Event, include_question_details: boo
         "server_time": _iso(now),
         "question": None,
         "ranking": None,
+        "ranking_reveal_rank": None,
         "answer_counts": None,
         "correct_choice": None,
         "transition_question_number": None,
@@ -178,9 +183,8 @@ def build_monitor_state(db: Session, event: Event, include_question_details: boo
         if event.phase.value == "CORRECT_ANSWER_SHOWN":
             state["correct_choice"] = question.correct_choice.value
     if event.phase.value == "RANKING":
-        # 会場モニターのランキング画面は最大10位まで表示する(表示件数のみの変更、
-        # 順位算出ロジック(compute_ranking内の集計・ソート・同点処理)は一切変更しない)。
-        state["ranking"] = compute_ranking(db, event.id, limit=10)
+        state["ranking"] = compute_ranking(db, event.id, limit=settings.ranking_display_limit)
+        state["ranking_reveal_rank"] = event.ranking_reveal_rank
     return state
 
 

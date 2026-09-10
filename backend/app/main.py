@@ -44,6 +44,7 @@ def on_startup():
     Base.metadata.create_all(bind=engine)
     _ensure_quiz_phase_enum_values()
     _ensure_question_practice_column()
+    _ensure_ranking_reveal_column()
     manager.set_loop(asyncio.get_event_loop())
 
 
@@ -66,6 +67,12 @@ def _ensure_question_practice_column() -> None:
         conn.execute(
             text("ALTER TABLE questions ADD COLUMN IF NOT EXISTS is_practice BOOLEAN NOT NULL DEFAULT FALSE")
         )
+
+
+def _ensure_ranking_reveal_column() -> None:
+    with engine.connect() as conn:
+        conn = conn.execution_options(isolation_level="AUTOCOMMIT")
+        conn.execute(text("ALTER TABLE events ADD COLUMN IF NOT EXISTS ranking_reveal_rank INTEGER"))
 
 
 @app.get("/api/health")

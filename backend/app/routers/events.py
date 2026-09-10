@@ -126,7 +126,7 @@ def duplicate_event(event_id: UUID, db: Session = Depends(get_db), _admin=Depend
     base_name = source.name
     if len(base_name) + len(suffix) > 200:
         base_name = base_name[: 200 - len(suffix)]
-    new_event = Event(name=f"{base_name}{suffix}")
+    new_event = Event(name=f"{base_name}{suffix}", ranking_reveal_rank=None)
     db.add(new_event)
     db.flush()  # new_event.id を確定させる
 
@@ -184,6 +184,7 @@ def reset_event(event_id: UUID, db: Session = Depends(get_db), _admin=Depends(re
     event.status = EventStatus.CREATED
     event.answer_started_at = None
     event.answer_deadline = None
+    event.ranking_reveal_rank = None
     db.commit()
     db.refresh(event)
 

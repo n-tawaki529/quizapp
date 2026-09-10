@@ -1,16 +1,31 @@
 import type { ReactNode } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { mediaUrl } from "../api";
 import { useEventSocket } from "../useEventSocket";
 import { useCountdown } from "../useCountdown";
 import { useCanvasScale } from "../useCanvasScale";
-import { MonitorState } from "../types";
+import { MonitorState, RankingEntry } from "../types";
 import ChoiceCard from "../components/monitor/ChoiceCard";
 import QuestionInfoPanel from "../components/monitor/QuestionInfoPanel";
 import RankingRow from "../components/monitor/RankingRow";
 
+// 開発時の10行レイアウト確認専用。URLから明示的に有効化した場合だけ使う。
+const DEBUG_RANKING: RankingEntry[] = [
+  { rank: 1, participant_id: "debug-01", name: "山田太郎", correct_count: 10, total_response_time_ms: 12345 },
+  { rank: 2, participant_id: "debug-02", name: "テストユーザー02", correct_count: 9, total_response_time_ms: 14210 },
+  { rank: 3, participant_id: "debug-03", name: "佐藤", correct_count: 9, total_response_time_ms: 16580 },
+  { rank: 4, participant_id: "debug-04", name: "かなり長めの表示名テスト", correct_count: 8, total_response_time_ms: 18432 },
+  { rank: 5, participant_id: "debug-05", name: "鈴木一郎", correct_count: 8, total_response_time_ms: 20123 },
+  { rank: 6, participant_id: "debug-06", name: "User-0006", correct_count: 7, total_response_time_ms: 22456 },
+  { rank: 7, participant_id: "debug-07", name: "あいうえおかきくけこ", correct_count: 6, total_response_time_ms: 25120 },
+  { rank: 8, participant_id: "debug-08", name: "田中", correct_count: 5, total_response_time_ms: 27890 },
+  { rank: 9, participant_id: "debug-09", name: "participant09", correct_count: 4, total_response_time_ms: 30111 },
+  { rank: 10, participant_id: "debug-10", name: "最下位テスト", correct_count: 3, total_response_time_ms: 33450 },
+];
+
 export default function Monitor() {
   const { eventId } = useParams<{ eventId: string }>();
+  const [searchParams] = useSearchParams();
   const { state, connected } = useEventSocket<MonitorState>(eventId, "monitor");
   const remainingMs = useCountdown(state?.answer_deadline, state?.server_time);
   const seconds = remainingMs !== null ? Math.ceil(remainingMs / 1000) : null;
@@ -29,13 +44,21 @@ export default function Monitor() {
   }
 
   if (state.phase === "RANKING" && state.ranking) {
+    const ranking = searchParams.get("debugRanking") === "10" ? DEBUG_RANKING : state.ranking;
+    const revealRank = state.ranking_reveal_rank;
+    const isComplete = revealRank === 0;
+
     return renderCanvas(
       <>
+        <h1 className="monitor-ranking-heading">最終ランキング</h1>
         <div className="monitor-ranking-board">
-          {/* 表示順は state.ranking(バックエンドの compute_ranking が算出した順位)をそのまま使用し、
-              フロント側での再計算・再ソートは一切行わない。 */}
-          {state.ranking.map((r) => (
-            <RankingRow key={r.participant_id} entry={r} />
+          {ranking.map((r) => (
+            <RankingRow
+              key={r.participant_id}
+              entry={r}
+              revealed={isComplete || (revealRank !== null && r.rank >= revealRank)}
+              highlighted={revealRank !== null && revealRank > 0 && r.rank === revealRank}
+            />
           ))}
         </div>
         {!connected && <p style={{ color: "#b91c1c" }}>サーバーとの接続が切れています。再接続を試みています...</p>}

@@ -6,6 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..database import SessionLocal, get_db
+from ..config import get_settings
 from ..models import Answer, Event, EventStatus, Participant, Question, QuizPhase
 from ..quiz_state import build_admin_state, build_monitor_state, build_participant_state, compute_ranking
 from ..schemas import AnswerRequest, AnswerResult, RankingResponse
@@ -13,6 +14,7 @@ from ..security import require_admin, require_participant
 from ..ws_manager import manager
 
 router = APIRouter(tags=["quiz"])
+settings = get_settings()
 
 
 def _get_event_or_404(db: Session, event_id: UUID) -> Event:
@@ -205,10 +207,32 @@ def show_correct_answer(event_id: UUID, db: Session = Depends(get_db), _admin=De
 def show_ranking(event_id: UUID, db: Session = Depends(get_db), _admin=Depends(require_admin)):
     event = _get_event_or_404(db, event_id)
     event.phase = QuizPhase.RANKING
+    event.ranking_reveal_rank = None
     db.commit()
     db.refresh(event)
     _broadcast_current_state(db, event)
     return {"ok": True}
+
+
+@router.post("/api/admin/events/{event_id}/ranking-reveal-next")
+def ranking_reveal_next(event_id: UUID, db: Session = Depends(get_db), _admin=Depends(require_admin)):
+    event = _get_event_or_404(db, event_id)
+    if event.phase != QuizPhase.RANKING:
+        raise HTTPException(status_code=422, detail="ランキング発表中ではありません")
+
+    ranking = compute_ranking(db, event.id, limit=settings.ranking_display_limit)
+    display_count = len(ranking)
+    if event.ranking_reveal_rank is None:
+        event.ranking_reveal_rank = display_count
+    elif event.ranking_reveal_rank > 0:
+        event.ranking_reveal_rank -= 1
+    else:
+        event.ranking_reveal_rank = 0
+
+    db.commit()
+    db.refresh(event)
+    _broadcast_current_state(db, event)
+    return {"ok": True, "ranking_reveal_rank": event.ranking_reveal_rank}
 
 
 @router.get("/api/admin/events/{event_id}/ranking", response_model=RankingResponse)
