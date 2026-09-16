@@ -6,6 +6,8 @@ import { useEventSocket } from "../useEventSocket";
 import { EventAdminDetail, MonitorState, QuestionAdminOut } from "../types";
 import QuestionForm from "./QuestionForm";
 
+const PROGRESSION_CONFIRM_STORAGE_KEY = "quiz_admin_confirm_progression";
+
 const PHASE_LABEL: Record<string, string> = {
   NOT_STARTED: "未開始",
   QUESTION_TRANSITION: "問題切替",
@@ -151,6 +153,9 @@ export default function AdminEvent() {
   const [editing, setEditing] = useState<QuestionAdminOut | null | "new">(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirmProgression, setConfirmProgression] = useState(() => {
+    return localStorage.getItem(PROGRESSION_CONFIRM_STORAGE_KEY) !== "false";
+  });
 
   const { state, connected } = useEventSocket<MonitorState>(eventId, "admin", {
     token: getAdminToken(),
@@ -194,8 +199,8 @@ export default function AdminEvent() {
     await loadQuestions();
   }
 
-  async function runAction(action: () => Promise<unknown>, confirmMsg?: string) {
-    if (confirmMsg && !window.confirm(confirmMsg)) return;
+  async function runAction(action: () => Promise<unknown>, confirmMsg?: string, progression = true) {
+    if (confirmMsg && (!progression || confirmProgression) && !window.confirm(confirmMsg)) return;
     setBusy(true);
     setError(null);
     try {
@@ -332,7 +337,8 @@ export default function AdminEvent() {
             onClick={() =>
               runAction(
                 () => adminApi.post(`/api/admin/events/${eventId}/reset`),
-                "この大会をリセットしますか？\n参加者・回答記録・ランキング結果は削除され、元に戻せません。"
+                "この大会をリセットしますか？\n参加者・回答記録・ランキング結果は削除され、元に戻せません。",
+                false
               )
             }
           >
@@ -519,6 +525,19 @@ export default function AdminEvent() {
               <button className="btn secondary" disabled={busy} onClick={showQuestion}>問題を表示</button>
             </div>
           )}
+
+          <label className="admin-progression-setting">
+            <input
+              type="checkbox"
+              checked={confirmProgression}
+              onChange={(event) => {
+                const enabled = event.target.checked;
+                setConfirmProgression(enabled);
+                localStorage.setItem(PROGRESSION_CONFIRM_STORAGE_KEY, String(enabled));
+              }}
+            />
+            <span>進行操作の確認ダイアログを表示する</span>
+          </label>
 
           <details className="admin-other-actions">
             <summary>その他の操作</summary>
