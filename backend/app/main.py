@@ -114,6 +114,7 @@ def on_startup():
     _ensure_quiz_phase_enum_values()
     _ensure_question_practice_column()
     _ensure_question_media_columns()
+    _ensure_choice_reveal_text_column()
     _ensure_ranking_reveal_column()
     manager.set_loop(asyncio.get_event_loop())
 
@@ -159,6 +160,12 @@ def _ensure_question_media_columns() -> None:
         conn.execute(text("ALTER TABLE questions ADD COLUMN IF NOT EXISTS pre_question_media_url VARCHAR(1000)"))
         conn.execute(text("ALTER TABLE questions ADD COLUMN IF NOT EXISTS pre_correct_media_type question_media_type NOT NULL DEFAULT 'NONE'"))
         conn.execute(text("ALTER TABLE questions ADD COLUMN IF NOT EXISTS pre_correct_media_url VARCHAR(1000)"))
+
+
+def _ensure_choice_reveal_text_column() -> None:
+    with engine.connect() as conn:
+        conn = conn.execution_options(isolation_level="AUTOCOMMIT")
+        conn.execute(text("ALTER TABLE choices ADD COLUMN IF NOT EXISTS reveal_text VARCHAR(20)"))
 
 
 @app.get("/api/health")

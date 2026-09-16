@@ -116,7 +116,13 @@ def create_question(
     )
     for c in body.choices:
         question.choices.append(
-            Choice(choice_key=c.choice_key, content_type=c.content_type, text=c.text, media_url=c.media_url)
+            Choice(
+                choice_key=c.choice_key,
+                content_type=c.content_type,
+                text=c.text,
+                media_url=c.media_url,
+                reveal_text=c.reveal_text,
+            )
         )
     db.add(question)
     db.commit()
@@ -217,9 +223,16 @@ def update_question(
                 target.content_type = c.content_type
                 target.text = c.text
                 target.media_url = c.media_url
+                target.reveal_text = c.reveal_text
             else:
                 question.choices.append(
-                    Choice(choice_key=c.choice_key, content_type=c.content_type, text=c.text, media_url=c.media_url)
+                    Choice(
+                        choice_key=c.choice_key,
+                        content_type=c.content_type,
+                        text=c.text,
+                        media_url=c.media_url,
+                        reveal_text=c.reveal_text,
+                    )
                 )
         for choice in question.choices:
             if choice.choice_key not in incoming_keys:

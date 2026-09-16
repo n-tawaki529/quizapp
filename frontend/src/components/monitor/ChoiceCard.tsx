@@ -23,28 +23,36 @@ function ChoiceCard({ choice, variant, count, dim }: Props) {
 
   return (
     <div
-      className={`monitor-choice-card ${variant === "text" ? "text-card" : "media-card"} ${colorClass} ${
-        dim ? "dim" : ""
-      }`}
+      className={`monitor-choice-card ${variant === "text" ? "text-card" : "media-card"} ${colorClass}`}
     >
+      {variant === "text" && dim && <span className="monitor-choice-dim-overlay" aria-hidden="true" />}
       <span className={`monitor-choice-number ${colorClass}`}>{label}</span>
       <span className="monitor-choice-content">
-        {choice.content_type === "TEXT" && <span className="monitor-choice-text">{choice.text}</span>}
+        {choice.content_type === "TEXT" && (
+          <span className="monitor-choice-text">{choice.text}</span>
+        )}
         {choice.content_type === "IMAGE" && choice.media_url && (
-          <div className="monitor-choice-media-wrap">
+          <div className={`monitor-choice-media-wrap${dim ? " dim" : ""}`}>
             <img src={mediaUrl(choice.media_url)} alt="" />
           </div>
         )}
         {choice.content_type === "VIDEO" && choice.media_url && (
-          <div className="monitor-choice-media-wrap">
+          <div className={`monitor-choice-media-wrap${dim ? " dim" : ""}`}>
             <video src={mediaUrl(choice.media_url)} muted autoPlay loop />
           </div>
         )}
       </span>
-      {count != null && (
-        <span className={`monitor-count-badge ${variant === "text" ? "text-badge" : "media-badge"} ${colorClass}`}>
+      {(variant === "text" || count != null) && (
+        <span
+          className={`monitor-count-badge ${variant === "text" ? "text-badge" : "media-badge"} ${colorClass}${
+            count == null ? " is-hidden" : ""
+          }`}
+        >
           {count}
         </span>
+      )}
+      {variant === "media" && choice.content_type === "IMAGE" && choice.reveal_text?.trim() && (
+        <span className="monitor-choice-reveal-text">{choice.reveal_text}</span>
       )}
     </div>
   );

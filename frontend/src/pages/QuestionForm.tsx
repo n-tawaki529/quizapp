@@ -8,6 +8,7 @@ interface ChoiceFormState {
   content_type: ChoiceContentType;
   text: string;
   media_url: string;
+  reveal_text: string;
 }
 
 type ChoiceCount = 2 | 3 | 4;
@@ -23,10 +24,10 @@ interface Props {
 
 function buildInitialChoices(initial?: QuestionAdminOut | null): Record<ChoiceKey, ChoiceFormState> {
   const base: Record<ChoiceKey, ChoiceFormState> = {
-    A: { content_type: "TEXT", text: "", media_url: "" },
-    B: { content_type: "TEXT", text: "", media_url: "" },
-    C: { content_type: "TEXT", text: "", media_url: "" },
-    D: { content_type: "TEXT", text: "", media_url: "" },
+    A: { content_type: "TEXT", text: "", media_url: "", reveal_text: "" },
+    B: { content_type: "TEXT", text: "", media_url: "", reveal_text: "" },
+    C: { content_type: "TEXT", text: "", media_url: "", reveal_text: "" },
+    D: { content_type: "TEXT", text: "", media_url: "", reveal_text: "" },
   };
   if (initial) {
     for (const c of initial.choices) {
@@ -34,6 +35,7 @@ function buildInitialChoices(initial?: QuestionAdminOut | null): Record<ChoiceKe
         content_type: c.content_type,
         text: c.text || "",
         media_url: c.media_url || "",
+        reveal_text: c.reveal_text || "",
       };
     }
   }
@@ -137,6 +139,7 @@ export default function QuestionForm({
           content_type: choices[key].content_type,
           text: choices[key].content_type === "TEXT" ? choices[key].text : null,
           media_url: choices[key].content_type === "TEXT" ? null : choices[key].media_url || null,
+          reveal_text: choices[key].content_type === "IMAGE" ? choices[key].reveal_text || null : null,
         })),
       };
       if (initial) {
@@ -304,19 +307,32 @@ export default function QuestionForm({
               <input value={choices[key].text} onChange={(e) => updateChoice(key, { text: e.target.value })} />
             </div>
           ) : (
-            <div className="row">
-              <input
-                type="file"
-                accept={choices[key].content_type === "IMAGE" ? "image/*" : "video/*"}
-                onChange={(e) => e.target.files && handleChoiceMediaUpload(key, e.target.files[0])}
-              />
-              {uploadingKey === key && <span>アップロード中...</span>}
-              {choices[key].media_url && (
-                <a href={mediaUrl(choices[key].media_url)} target="_blank" rel="noreferrer">
-                  プレビュー
-                </a>
+            <>
+              <div className="row">
+                <input
+                  type="file"
+                  accept={choices[key].content_type === "IMAGE" ? "image/*" : "video/*"}
+                  onChange={(e) => e.target.files && handleChoiceMediaUpload(key, e.target.files[0])}
+                />
+                {uploadingKey === key && <span>アップロード中...</span>}
+                {choices[key].media_url && (
+                  <a href={mediaUrl(choices[key].media_url)} target="_blank" rel="noreferrer">
+                    プレビュー
+                  </a>
+                )}
+              </div>
+              {choices[key].content_type === "IMAGE" && (
+                <div className="field">
+                  <label>正解発表時の説明（任意）</label>
+                  <input
+                    type="text"
+                    maxLength={20}
+                    value={choices[key].reveal_text}
+                    onChange={(e) => updateChoice(key, { reveal_text: e.target.value })}
+                  />
+                </div>
               )}
-            </div>
+            </>
           )}
         </div>
       ))}

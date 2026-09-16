@@ -126,13 +126,16 @@ def compute_participant_correct_count(db: Session, event: Event, participant_id:
     return query.count()
 
 
-def build_choice_out(choice) -> dict:
-    return {
+def build_choice_out(choice, include_reveal_text: bool = False) -> dict:
+    result = {
         "choice_key": choice.choice_key.value,
         "content_type": choice.content_type.value,
         "text": choice.text,
         "media_url": choice.media_url,
     }
+    if include_reveal_text:
+        result["reveal_text"] = choice.reveal_text
+    return result
 
 
 def build_monitor_state(db: Session, event: Event, include_question_details: bool = False) -> dict:
@@ -176,7 +179,14 @@ def build_monitor_state(db: Session, event: Event, include_question_details: boo
                 "question_media_type": question.question_media_type.value,
                 "question_media_url": question.question_media_url,
                 "time_limit_seconds": question.time_limit_seconds,
-                "choices": [build_choice_out(c) for c in question.choices],
+                "choices": [
+                    build_choice_out(
+                        c,
+                        include_reveal_text=include_question_details
+                        or event.phase == QuizPhase.CORRECT_ANSWER_SHOWN,
+                    )
+                    for c in question.choices
+                ],
                 "is_practice": question.is_practice,
             }
             if include_question_details:

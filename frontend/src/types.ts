@@ -34,6 +34,7 @@ export interface ChoiceOut {
   content_type: ChoiceContentType;
   text: string | null;
   media_url: string | null;
+  reveal_text?: string | null;
 }
 
 export interface QuestionAdminOut {

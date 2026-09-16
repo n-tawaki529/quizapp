@@ -681,9 +681,8 @@ th, td {
 .monitor-choice-card.color-c { border-color: var(--monitor-color-c); }
 .monitor-choice-card.color-d { border-color: var(--monitor-color-d); }
 
-/* 正解発表: 不正解の3択をカード全体(枠・番号・テキスト/メディア・回答人数)ごと暗く表示する。
-   正解の選択肢は現在の明るさを維持するため何もクラスを付けない。 */
-.monitor-choice-card.dim {
+/* 正解発表: 不正解の問題内容だけを暗くし、番号・回答人数・説明文・枠線は明るく保つ。 */
+.monitor-choice-media-wrap.dim {
   filter: brightness(0.42) saturate(0.7);
 }
 
@@ -692,13 +691,24 @@ th, td {
   align-items: center;
   gap: 24px;
   padding: 18px 32px;
+  height: 120px;
   min-height: 120px;
+  box-sizing: border-box;
 }
 
 .monitor-choice-card.text-card .monitor-choice-content {
   flex: 1;
   min-width: 0;
   display: flex;
+}
+
+.monitor-choice-dim-overlay {
+  position: absolute;
+  inset: 7px;
+  border-radius: 17px;
+  background: rgba(0, 0, 0, 0.58);
+  pointer-events: none;
+  z-index: 1;
 }
 
 .monitor-choice-card.media-card {
@@ -724,17 +734,19 @@ th, td {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 34px;
+  font-size: 46px;
   font-weight: 800;
+  position: relative;
+  z-index: 2;
 }
 
 .monitor-choice-card.media-card .monitor-choice-number {
   position: absolute;
   top: 10px;
   left: 10px;
-  width: 46px;
-  height: 46px;
-  font-size: 22px;
+  width: 70px;
+  height: 70px;
+  font-size: 38px;
   z-index: 2;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
@@ -786,25 +798,48 @@ th, td {
   border-radius: 12px;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   z-index: 2;
+  position: relative;
+}
+
+.monitor-count-badge.is-hidden {
+  visibility: hidden;
 }
 
 .monitor-count-badge.text-badge {
   flex-shrink: 0;
   min-width: 110px;
-  height: 64px;
-  font-size: 34px;
+  height: 76px;
+  font-size: 46px;
   padding: 0 16px;
+  box-sizing: border-box;
 }
 
 .monitor-count-badge.media-badge {
   position: absolute;
   right: 12px;
   bottom: 12px;
-  min-width: 60px;
-  height: 48px;
-  font-size: 26px;
-  padding: 0 10px;
+  min-width: 72px;
+  height: 76px;
+  font-size: 50px;
+  padding: 0 16px;
+  box-sizing: border-box;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.monitor-choice-reveal-text {
+  position: absolute;
+  left: 14px;
+  bottom: 12px;
+  max-width: calc(100% - 120px);
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #111827;
+  font-size: 38px;
+  font-weight: 800;
+  line-height: 1.2;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  z-index: 2;
 }
 
 .monitor-count-badge.color-a { background: var(--monitor-color-a); }

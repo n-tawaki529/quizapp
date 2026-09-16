@@ -152,6 +152,7 @@ def duplicate_event(event_id: UUID, db: Session = Depends(get_db), _admin=Depend
                     content_type=c.content_type,
                     text=c.text,
                     media_url=_copy_media(c.media_url),
+                    reveal_text=c.reveal_text,
                 )
             )
         db.add(new_question)

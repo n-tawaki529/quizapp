@@ -44,6 +44,7 @@ class ChoiceInput(BaseModel):
     content_type: ChoiceContentType = ChoiceContentType.TEXT
     text: str | None = None
     media_url: str | None = None
+    reveal_text: str | None = Field(default=None, max_length=20)
 
 
 class ChoiceOut(BaseModel):
@@ -51,6 +52,7 @@ class ChoiceOut(BaseModel):
     content_type: ChoiceContentType
     text: str | None = None
     media_url: str | None = None
+    reveal_text: str | None = None
 
     class Config:
         from_attributes = True

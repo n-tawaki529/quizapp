@@ -81,6 +81,7 @@ function QuestionPreview({
             {choice.content_type === "TEXT" ? choice.text : (
               <>
                 <span className="admin-media-badge">{choice.content_type}</span>
+                {choice.reveal_text?.trim() && <span> / {choice.reveal_text}</span>}
                 {choice.content_type === "IMAGE" && choice.media_url && (
                   <img className="admin-choice-thumbnail" src={mediaUrl(choice.media_url)} alt={`${choice.choice_key}の画像`} />
                 )}

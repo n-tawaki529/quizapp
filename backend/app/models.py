@@ -137,6 +137,7 @@ class Choice(Base):
     )
     text: Mapped[str | None] = mapped_column(Text, nullable=True)
     media_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    reveal_text: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     question: Mapped["Question"] = relationship("Question", back_populates="choices")
 
