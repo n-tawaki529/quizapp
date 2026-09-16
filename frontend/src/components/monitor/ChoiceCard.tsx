@@ -22,8 +22,13 @@ function ChoiceCard({ choice, variant, count, dim, phase }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    if (choice.content_type === "VIDEO" && phase !== "ANSWER_OPEN") {
-      videoRef.current?.pause();
+    const video = videoRef.current;
+    if (choice.content_type !== "VIDEO" || !video) return;
+
+    if (phase === "ANSWER_OPEN") {
+      void video.play().catch(() => undefined);
+    } else {
+      video.pause();
     }
   }, [choice.content_type, phase]);
 
@@ -60,7 +65,7 @@ function ChoiceCard({ choice, variant, count, dim, phase }: Props) {
           {count}
         </span>
       )}
-      {variant === "media" && choice.content_type === "IMAGE" && choice.reveal_text?.trim() && (
+      {variant === "media" && choice.content_type !== "TEXT" && choice.reveal_text?.trim() && (
         <span className="monitor-choice-reveal-text">{choice.reveal_text}</span>
       )}
     </div>

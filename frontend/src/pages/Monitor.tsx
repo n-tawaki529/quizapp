@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { mediaUrl } from "../api";
 import { useEventSocket } from "../useEventSocket";
@@ -30,6 +30,20 @@ export default function Monitor() {
   const remainingMs = useCountdown(state?.answer_deadline, state?.server_time);
   const seconds = remainingMs !== null ? Math.ceil(remainingMs / 1000) : null;
   const scale = useCanvasScale();
+  const questionVideoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (state?.question?.question_media_type !== "VIDEO") return;
+
+    const video = questionVideoRef.current;
+    if (!video) return;
+
+    if (state?.phase === "ANSWER_OPEN") {
+      void video.play().catch(() => undefined);
+    } else {
+      video.pause();
+    }
+  }, [state?.phase, state?.question?.id, state?.question?.question_media_type]);
 
   const renderCanvas = (content: ReactNode) => (
     <div className="monitor-viewport">
@@ -140,14 +154,17 @@ export default function Monitor() {
   const q = state.question;
   // Choiceの content_type が全てTEXTなら文章問題(縦並び)、それ以外は選択肢数別のグリッドにする。
   const isMediaChoices = !!q && q.choices.some((c) => c.content_type !== "TEXT");
-  const isImageTextChoices =
-    !!q && q.question_media_type === "IMAGE" && !!q.question_media_url && q.choices.every((c) => c.content_type === "TEXT");
+  const isQuestionMediaText =
+    !!q &&
+    (q.question_media_type === "IMAGE" || q.question_media_type === "VIDEO") &&
+    !!q.question_media_url &&
+    q.choices.every((c) => c.content_type === "TEXT");
   let choiceLayoutClass = "monitor-choice-list-text";
   if (isMediaChoices) {
     const choiceCount = q?.choices.length ?? 4;
     choiceLayoutClass = choiceCount === 4 ? "monitor-choice-grid-media" : `monitor-choice-grid-media-${choiceCount}`;
   }
-  if (isImageTextChoices) {
+  if (isQuestionMediaText) {
     const choiceCount = q?.choices.length ?? 4;
     choiceLayoutClass =
       choiceCount === 4 ? "monitor-choice-grid-image-text" : `monitor-choice-grid-image-text-${choiceCount}`;
@@ -164,20 +181,40 @@ export default function Monitor() {
       {!q && <h1 className="monitor-question-text">{state.event_name ?? "クイズ大会"}</h1>}
       {q && (
         <>
-          {q.question_media_type === "IMAGE" && q.question_media_url && !isImageTextChoices && (
+          {q.question_media_type === "IMAGE" && q.question_media_url && !isQuestionMediaText && (
             <img className="monitor-media" src={mediaUrl(q.question_media_url)} alt="問題画像" />
           )}
-          {q.question_media_type === "VIDEO" && q.question_media_url && (
-            <video className="monitor-media" src={mediaUrl(q.question_media_url)} controls autoPlay playsInline>
+          {q.question_media_type === "VIDEO" && q.question_media_url && !isQuestionMediaText && (
+            <video
+              ref={questionVideoRef}
+              className="monitor-media"
+              src={mediaUrl(q.question_media_url)}
+              autoPlay={state.phase === "ANSWER_OPEN"}
+              playsInline
+              preload="auto"
+            >
               <track kind="captions" />
             </video>
           )}
 
-          <div className={`monitor-main${isImageTextChoices ? " monitor-main-image-text" : ""}`}>
-            <div className={`monitor-choices-area${isImageTextChoices ? " monitor-choices-area-image-text" : ""}`}>
-              {isImageTextChoices && q.question_media_url && (
+          <div className={`monitor-main${isQuestionMediaText ? " monitor-main-image-text" : ""}`}>
+            <div className={`monitor-choices-area${isQuestionMediaText ? " monitor-choices-area-image-text" : ""}`}>
+              {isQuestionMediaText && q.question_media_url && (
                 <div className="monitor-image-text-media-frame">
-                  <img className="monitor-image-text-media" src={mediaUrl(q.question_media_url)} alt="" />
+                  {q.question_media_type === "IMAGE" ? (
+                    <img className="monitor-image-text-media" src={mediaUrl(q.question_media_url)} alt="" />
+                  ) : (
+                    <video
+                      ref={questionVideoRef}
+                      className="monitor-image-text-media"
+                      src={mediaUrl(q.question_media_url)}
+                      autoPlay={state.phase === "ANSWER_OPEN"}
+                      playsInline
+                      preload="auto"
+                    >
+                      <track kind="captions" />
+                    </video>
+                  )}
                 </div>
               )}
               <div className={choiceLayoutClass}>

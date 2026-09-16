@@ -141,7 +141,7 @@ export default function QuestionForm({
           content_type: choices[key].content_type,
           text: choices[key].content_type === "TEXT" ? choices[key].text : null,
           media_url: choices[key].content_type === "TEXT" ? null : choices[key].media_url || null,
-          reveal_text: choices[key].content_type === "IMAGE" ? choices[key].reveal_text || null : null,
+          reveal_text: choices[key].content_type !== "TEXT" ? choices[key].reveal_text || null : null,
         })),
       };
       if (initial) {
@@ -335,17 +335,15 @@ export default function QuestionForm({
                   </a>
                 )}
               </div>
-              {choices[key].content_type === "IMAGE" && (
-                <div className="field">
-                  <label>正解発表時の説明（任意）</label>
-                  <input
-                    type="text"
-                    maxLength={20}
-                    value={choices[key].reveal_text}
-                    onChange={(e) => updateChoice(key, { reveal_text: e.target.value })}
-                  />
-                </div>
-              )}
+              <div className="field">
+                <label>正解発表時の説明（任意）</label>
+                <input
+                  type="text"
+                  maxLength={20}
+                  value={choices[key].reveal_text}
+                  onChange={(e) => updateChoice(key, { reveal_text: e.target.value })}
+                />
+              </div>
             </>
           )}
         </div>
