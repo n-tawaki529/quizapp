@@ -116,6 +116,7 @@ def on_startup():
     _ensure_question_media_columns()
     _ensure_choice_reveal_text_column()
     _ensure_ranking_reveal_column()
+    _ensure_dynamic_correct_answer_columns()
     manager.set_loop(asyncio.get_event_loop())
 
 
@@ -166,6 +167,13 @@ def _ensure_choice_reveal_text_column() -> None:
     with engine.connect() as conn:
         conn = conn.execution_options(isolation_level="AUTOCOMMIT")
         conn.execute(text("ALTER TABLE choices ADD COLUMN IF NOT EXISTS reveal_text VARCHAR(20)"))
+
+
+def _ensure_dynamic_correct_answer_columns() -> None:
+    with engine.connect() as conn:
+        conn = conn.execution_options(isolation_level="AUTOCOMMIT")
+        conn.execute(text("ALTER TABLE questions ADD COLUMN IF NOT EXISTS dynamic_correct_answer BOOLEAN NOT NULL DEFAULT FALSE"))
+        conn.execute(text("ALTER TABLE questions ALTER COLUMN correct_choice DROP NOT NULL"))
 
 
 @app.get("/api/health")

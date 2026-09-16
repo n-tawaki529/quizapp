@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, selectinload
 
 from ..database import get_db
-from ..models import Choice, Event, EventStatus, Participant, Question, QuizPhase
+from ..models import Choice, Event, EventQuestionState, EventStatus, Participant, Question, QuizPhase
 from ..quiz_state import build_admin_state, build_monitor_state, build_participant_state
 from ..schemas import EventAdminDetail, EventCreateRequest, EventPublic
 from ..security import require_admin
@@ -143,6 +143,7 @@ def duplicate_event(event_id: UUID, db: Session = Depends(get_db), _admin=Depend
             pre_correct_media_url=_copy_media(q.pre_correct_media_url),
             time_limit_seconds=q.time_limit_seconds,
             correct_choice=q.correct_choice,
+            dynamic_correct_answer=q.dynamic_correct_answer,
             is_practice=q.is_practice,
         )
         for c in q.choices:
@@ -183,6 +184,7 @@ def reset_event(event_id: UUID, db: Session = Depends(get_db), _admin=Depends(re
 
     # participants を削除すると DB の ondelete=CASCADE により紐づく answers も連鎖削除される。
     db.query(Participant).filter(Participant.event_id == event_id).delete(synchronize_session=False)
+    db.query(EventQuestionState).filter(EventQuestionState.event_id == event_id).delete(synchronize_session=False)
 
     event.current_question_id = None
     event.phase = QuizPhase.NOT_STARTED

@@ -60,6 +60,7 @@ export default function QuestionForm({
   const [preCorrectMediaType, setPreCorrectMediaType] = useState<MediaType>(initial?.pre_correct_media_type ?? "NONE");
   const [preCorrectMediaUrl, setPreCorrectMediaUrl] = useState(initial?.pre_correct_media_url ?? "");
   const [timeLimit, setTimeLimit] = useState(initial?.time_limit_seconds ?? 10);
+  const [dynamicCorrectAnswer, setDynamicCorrectAnswer] = useState(initial?.dynamic_correct_answer ?? false);
   const [choiceCount, setChoiceCount] = useState<ChoiceCount>(
     initial && initial.choices.length >= 2 && initial.choices.length <= 4 ? (initial.choices.length as ChoiceCount) : 4,
   );
@@ -132,7 +133,8 @@ export default function QuestionForm({
         pre_correct_media_type: preCorrectMediaType,
         pre_correct_media_url: preCorrectMediaType === "NONE" ? null : preCorrectMediaUrl || null,
         time_limit_seconds: timeLimit,
-        correct_choice: correctChoice,
+        correct_choice: dynamicCorrectAnswer ? null : correctChoice,
+        dynamic_correct_answer: dynamicCorrectAnswer,
         is_practice: isPractice,
         choices: CHOICE_KEYS.slice(0, choiceCount).map((key) => ({
           choice_key: key,
@@ -175,6 +177,18 @@ export default function QuestionForm({
             既に練習問題が設定されているため、新たに練習問題として登録することはできません。
           </p>
         )}
+      </div>
+
+      <div className="field">
+        <label>正解の設定方法</label>
+        <label>
+          <input type="radio" name="correct_answer_mode" checked={!dynamicCorrectAnswer} onChange={() => setDynamicCorrectAnswer(false)} />{" "}
+          事前に正解を設定
+        </label>
+        <label>
+          <input type="radio" name="correct_answer_mode" checked={dynamicCorrectAnswer} onChange={() => setDynamicCorrectAnswer(true)} />{" "}
+          回答後に運営が設定
+        </label>
       </div>
 
       <div className="row">
@@ -280,7 +294,7 @@ export default function QuestionForm({
         <div className="card" key={key} style={{ background: "#f9fafb" }}>
           <div className="row" style={{ justifyContent: "space-between" }}>
             <strong>選択肢 {key}</strong>
-            <label className="row" style={{ gap: 4 }}>
+            {!dynamicCorrectAnswer && <label className="row" style={{ gap: 4 }}>
               <input
                 type="radio"
                 name="correct_choice"
@@ -288,7 +302,7 @@ export default function QuestionForm({
                 onChange={() => setCorrectChoice(key)}
               />
               これが正解
-            </label>
+            </label>}
           </div>
           <div className="field">
             <label>表示形式</label>

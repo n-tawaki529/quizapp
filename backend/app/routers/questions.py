@@ -73,6 +73,8 @@ def create_question(
     event_id: UUID, body: QuestionCreateRequest, db: Session = Depends(get_db), _admin=Depends(require_admin)
 ):
     _get_event_or_404(db, event_id)
+    if not body.dynamic_correct_answer and body.correct_choice is None:
+        raise HTTPException(status_code=422, detail="通常問題は正解を指定してください")
     _validate_choices(body.choices, body.correct_choice)
 
     count = db.query(Question).filter(Question.event_id == event_id).count()
@@ -111,7 +113,8 @@ def create_question(
         pre_correct_media_type=body.pre_correct_media_type,
         pre_correct_media_url=body.pre_correct_media_url,
         time_limit_seconds=body.time_limit_seconds,
-        correct_choice=body.correct_choice,
+        correct_choice=None if body.dynamic_correct_answer else body.correct_choice,
+        dynamic_correct_answer=body.dynamic_correct_answer,
         is_practice=body.is_practice,
     )
     for c in body.choices:
@@ -209,6 +212,13 @@ def update_question(
         question.pre_correct_media_url = body.pre_correct_media_url
     if body.time_limit_seconds is not None:
         question.time_limit_seconds = body.time_limit_seconds
+    target_dynamic = body.dynamic_correct_answer if body.dynamic_correct_answer is not None else question.dynamic_correct_answer
+    if not target_dynamic and body.correct_choice is None and question.correct_choice is None:
+        raise HTTPException(status_code=422, detail="通常問題は正解を指定してください")
+    if body.dynamic_correct_answer is not None:
+        question.dynamic_correct_answer = body.dynamic_correct_answer
+        if body.dynamic_correct_answer:
+            question.correct_choice = None
     if body.correct_choice is not None:
         question.correct_choice = body.correct_choice
 

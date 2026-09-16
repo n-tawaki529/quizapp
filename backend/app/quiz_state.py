@@ -16,11 +16,22 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .models import Answer, Event, Participant, Question, QuizPhase
+from .models import Answer, Event, EventQuestionState, Participant, Question, QuizPhase
 from .config import get_settings
 
 
 settings = get_settings()
+
+
+def get_effective_correct_choice(db: Session, event: Event, question: Question):
+    if not question.dynamic_correct_answer:
+        return question.correct_choice
+    run_state = (
+        db.query(EventQuestionState)
+        .filter(EventQuestionState.event_id == event.id, EventQuestionState.question_id == question.id)
+        .first()
+    )
+    return run_state.correct_choice if run_state else None
 
 
 def _iso(dt: datetime | None) -> str | None:
@@ -202,7 +213,8 @@ def build_monitor_state(db: Session, event: Event, include_question_details: boo
         if event.phase in (QuizPhase.ANSWER_COUNT_SHOWN, QuizPhase.PRE_CORRECT_MEDIA, QuizPhase.CORRECT_ANSWER_SHOWN):
             state["answer_counts"] = compute_answer_counts(db, question.id)
         if event.phase == QuizPhase.CORRECT_ANSWER_SHOWN:
-            state["correct_choice"] = question.correct_choice.value
+            correct_choice = get_effective_correct_choice(db, event, question)
+            state["correct_choice"] = correct_choice.value if correct_choice else None
         if event.phase == QuizPhase.PRE_QUESTION_MEDIA:
             state["pre_media"] = {
                 "media_type": question.pre_question_media_type.value,
@@ -301,4 +313,15 @@ def build_admin_state(db: Session, event: Event) -> dict:
     state["connected_participant_count"] = manager.count(str(event.id), "participant")
     # クイズ進行画面に常時表示するランキング上位5名(人数が0でもエラーにならない)。
     state["top_ranking"] = compute_ranking(db, event.id, limit=5)
+    if event.current_question_id:
+        question = db.get(Question, event.current_question_id)
+        if question:
+            correct_choice = get_effective_correct_choice(db, event, question)
+            state["admin_correct_choice"] = correct_choice.value if correct_choice else None
+            state["admin_correct_choice_set"] = correct_choice is not None
+            state["admin_dynamic_correct_answer"] = question.dynamic_correct_answer
+    else:
+        state["admin_correct_choice"] = None
+        state["admin_correct_choice_set"] = False
+        state["admin_dynamic_correct_answer"] = False
     return state

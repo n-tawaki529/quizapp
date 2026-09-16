@@ -69,7 +69,8 @@ class QuestionCreateRequest(BaseModel):
     pre_correct_media_type: MediaType = MediaType.NONE
     pre_correct_media_url: str | None = None
     time_limit_seconds: int = 10
-    correct_choice: ChoiceKey
+    correct_choice: ChoiceKey | None = None
+    dynamic_correct_answer: bool = False
     choices: list[ChoiceInput]
     is_practice: bool = False
 
@@ -85,6 +86,7 @@ class QuestionUpdateRequest(BaseModel):
     pre_correct_media_url: str | None = None
     time_limit_seconds: int | None = None
     correct_choice: ChoiceKey | None = None
+    dynamic_correct_answer: bool | None = None
     choices: list[ChoiceInput] | None = None
     is_practice: bool | None = None
 
@@ -100,7 +102,8 @@ class QuestionAdminOut(BaseModel):
     pre_correct_media_type: MediaType
     pre_correct_media_url: str | None
     time_limit_seconds: int
-    correct_choice: ChoiceKey
+    correct_choice: ChoiceKey | None
+    dynamic_correct_answer: bool
     choices: list[ChoiceOut]
     is_practice: bool
 
@@ -135,6 +138,10 @@ class AnswerResult(BaseModel):
     accepted: bool
     response_time_ms: int | None = None
     message: str = ""
+
+
+class SetCorrectChoiceRequest(BaseModel):
+    choice_key: ChoiceKey
 
 
 # ---------- Ranking ----------

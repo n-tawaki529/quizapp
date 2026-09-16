@@ -48,7 +48,8 @@ export interface QuestionAdminOut {
   pre_correct_media_type: MediaType;
   pre_correct_media_url: string | null;
   time_limit_seconds: number;
-  correct_choice: ChoiceKey;
+  correct_choice: ChoiceKey | null;
+  dynamic_correct_answer: boolean;
   choices: ChoiceOut[];
   is_practice: boolean;
 }
@@ -99,6 +100,9 @@ export interface MonitorState {
   ranking_reveal_rank: number | null;
   answer_counts: Partial<Record<ChoiceKey, number>> | null;
   correct_choice: ChoiceKey | null;
+  admin_correct_choice?: ChoiceKey | null;
+  admin_correct_choice_set?: boolean;
+  admin_dynamic_correct_answer?: boolean;
   participant_count?: number;
   answered_count?: number;
   connected_participant_count?: number;

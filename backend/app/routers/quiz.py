@@ -3,13 +3,14 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from ..database import SessionLocal, get_db
 from ..config import get_settings
-from ..models import Answer, Event, EventStatus, MediaType, Participant, Question, QuizPhase
-from ..quiz_state import build_admin_state, build_monitor_state, build_participant_state, compute_ranking
-from ..schemas import AnswerRequest, AnswerResult, RankingResponse
+from ..models import Answer, Event, EventQuestionState, EventStatus, MediaType, Participant, Question, QuizPhase
+from ..quiz_state import build_admin_state, build_monitor_state, build_participant_state, compute_ranking, get_effective_correct_choice
+from ..schemas import AnswerRequest, AnswerResult, RankingResponse, SetCorrectChoiceRequest
 from ..security import require_admin, require_participant
 from ..ws_manager import manager
 
@@ -209,6 +210,9 @@ def show_correct_answer(event_id: UUID, db: Session = Depends(get_db), _admin=De
     event = _get_event_or_404(db, event_id)
     if event.phase not in (QuizPhase.ANSWER_COUNT_SHOWN, QuizPhase.PRE_CORRECT_MEDIA):
         raise HTTPException(status_code=422, detail="回答結果を表示してから実行してください")
+    question = db.get(Question, event.current_question_id) if event.current_question_id else None
+    if question is None or get_effective_correct_choice(db, event, question) is None:
+        raise HTTPException(status_code=422, detail="正解を設定してください")
     event.phase = QuizPhase.CORRECT_ANSWER_SHOWN
     db.commit()
     db.refresh(event)
@@ -225,11 +229,50 @@ def show_pre_correct_media(event_id: UUID, db: Session = Depends(get_db), _admin
     question = db.get(Question, event.current_question_id) if event.current_question_id else None
     if question is None or question.pre_correct_media_type == MediaType.NONE or not question.pre_correct_media_url:
         raise HTTPException(status_code=422, detail="正解発表前メディアが設定されていません")
+    if get_effective_correct_choice(db, event, question) is None:
+        raise HTTPException(status_code=422, detail="正解を設定してください")
     event.phase = QuizPhase.PRE_CORRECT_MEDIA
     db.commit()
     db.refresh(event)
     _broadcast_current_state(db, event)
     return {"ok": True}
+
+
+@router.post("/api/admin/events/{event_id}/set-correct-choice")
+def set_correct_choice(
+    event_id: UUID,
+    body: SetCorrectChoiceRequest,
+    db: Session = Depends(get_db),
+    _admin=Depends(require_admin),
+):
+    event = _get_event_or_404(db, event_id)
+    if event.phase not in (QuizPhase.ANSWER_CLOSED, QuizPhase.ANSWER_COUNT_SHOWN):
+        raise HTTPException(status_code=422, detail="回答結果表示前または正解発表後は正解を変更できません")
+    question = db.get(Question, event.current_question_id) if event.current_question_id else None
+    if question is None or not question.dynamic_correct_answer:
+        raise HTTPException(status_code=422, detail="動的正解問題ではありません")
+    if not any(choice.choice_key == body.choice_key for choice in question.choices):
+        raise HTTPException(status_code=422, detail="正解は存在する選択肢から指定してください")
+
+    run_state = (
+        db.query(EventQuestionState)
+        .filter(EventQuestionState.event_id == event.id, EventQuestionState.question_id == question.id)
+        .first()
+    )
+    if run_state is None:
+        run_state = EventQuestionState(event_id=event.id, question_id=question.id)
+        db.add(run_state)
+    run_state.correct_choice = body.choice_key
+    db.flush()
+    db.execute(
+        update(Answer)
+        .where(Answer.question_id == question.id)
+        .values(is_correct=(Answer.choice == body.choice_key))
+    )
+    db.commit()
+    db.refresh(event)
+    _broadcast_current_state(db, event)
+    return {"ok": True, "correct_choice": body.choice_key.value}
 
 
 @router.post("/api/admin/events/{event_id}/show-ranking")
@@ -338,7 +381,8 @@ def submit_answer(
         return AnswerResult(accepted=False, message="既に回答済みです")
 
     response_time_ms = int((now - event.answer_started_at).total_seconds() * 1000)
-    is_correct = body.choice == question.correct_choice
+    correct_choice = get_effective_correct_choice(db, event, question)
+    is_correct = correct_choice is not None and body.choice == correct_choice
 
     answer = Answer(
         participant_id=body.participant_id,

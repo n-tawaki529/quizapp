@@ -111,7 +111,8 @@ class Question(Base):
     )
     pre_correct_media_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     time_limit_seconds: Mapped[int] = mapped_column(Integer, default=10, nullable=False)
-    correct_choice: Mapped[ChoiceKey] = mapped_column(SAEnum(ChoiceKey, name="choice_key_correct"), nullable=False)
+    correct_choice: Mapped[ChoiceKey | None] = mapped_column(SAEnum(ChoiceKey, name="choice_key_correct"), nullable=True)
+    dynamic_correct_answer: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_practice: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
@@ -120,6 +121,22 @@ class Question(Base):
     event: Mapped["Event"] = relationship("Event", back_populates="questions", foreign_keys=[event_id])
     choices: Mapped[list["Choice"]] = relationship(
         "Choice", back_populates="question", cascade="all, delete-orphan", order_by="Choice.choice_key"
+    )
+
+
+class EventQuestionState(Base):
+    __tablename__ = "event_question_states"
+    __table_args__ = (UniqueConstraint("event_id", "question_id", name="uq_event_question_state"),)
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    event_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("events.id", ondelete="CASCADE"), nullable=False
+    )
+    question_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("questions.id", ondelete="CASCADE"), nullable=False
+    )
+    correct_choice: Mapped[ChoiceKey | None] = mapped_column(
+        SAEnum(ChoiceKey, name="choice_key_correct"), nullable=True
     )
 
 

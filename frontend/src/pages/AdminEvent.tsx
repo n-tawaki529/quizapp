@@ -53,7 +53,9 @@ function QuestionPreview({
     );
   }
 
-  const correctChoice = question.choices.find((choice) => choice.choice_key === question.correct_choice);
+  const correctChoice = question.correct_choice
+    ? question.choices.find((choice) => choice.choice_key === question.correct_choice)
+    : null;
 
   return (
     <section className="admin-question-preview">
@@ -68,10 +70,10 @@ function QuestionPreview({
       <div className="admin-preview-meta">
         <span>制限時間: {question.time_limit_seconds}秒</span>
         <span>
-          正解: {question.correct_choice}{" "}
-          {correctChoice?.content_type === "TEXT"
+          正解: {question.dynamic_correct_answer ? "回答後に設定" : question.correct_choice}{" "}
+          {!question.dynamic_correct_answer && (correctChoice?.content_type === "TEXT"
             ? correctChoice.text
-            : <span className="admin-media-badge">{correctChoice?.content_type ?? "メディア"}</span>}
+            : <span className="admin-media-badge">{correctChoice?.content_type ?? "メディア"}</span>)}
         </span>
       </div>
       <ul className="admin-preview-choices">
@@ -316,6 +318,12 @@ export default function AdminEvent() {
     );
   const showNextRankingReveal = () =>
     runAction(() => adminApi.post(`/api/admin/events/${eventId}/ranking-reveal-next`));
+  const setCorrectChoice = (choiceKey: string) =>
+    runAction(
+      () => adminApi.post(`/api/admin/events/${eventId}/set-correct-choice`, { choice_key: choiceKey }),
+      "この選択肢を正解に設定します。よろしいですか?",
+      false,
+    );
 
   return (
     <div className="page">
@@ -394,7 +402,7 @@ export default function AdminEvent() {
                     </td>
                     <td>{practiceQuestion.question_text}</td>
                     <td>{practiceQuestion.time_limit_seconds}秒</td>
-                    <td>{practiceQuestion.correct_choice}</td>
+                    <td>{practiceQuestion.dynamic_correct_answer ? "回答後に設定" : practiceQuestion.correct_choice}</td>
                     <td className="row">
                       <button className="btn secondary" onClick={() => setEditing(practiceQuestion)}>
                         編集
@@ -410,7 +418,7 @@ export default function AdminEvent() {
                     <td>{q.question_number}</td>
                     <td>{q.question_text}</td>
                     <td>{q.time_limit_seconds}秒</td>
-                    <td>{q.correct_choice}</td>
+                    <td>{q.dynamic_correct_answer ? "回答後に設定" : q.correct_choice}</td>
                     <td className="row">
                       <button className="btn secondary" onClick={() => handleMove(idx, -1)} disabled={idx === 0}>
                         ↑
@@ -486,6 +494,30 @@ export default function AdminEvent() {
             <span>接続中: {state?.connected_participant_count ?? "-"}</span>
             <span>回答数: {state?.answered_count ?? "-"}</span>
           </div>
+          {currentQuestionDetails?.dynamic_correct_answer &&
+            (phase === "ANSWER_CLOSED" || phase === "ANSWER_COUNT_SHOWN") && (
+              <div className="card" style={{ marginTop: 16, background: "#fff7ed" }}>
+                <h3>正解を設定</h3>
+                <div className="row">
+                  {currentQuestionDetails.choices.map((choice) => (
+                    <button
+                      className={`btn ${state?.admin_correct_choice === choice.choice_key ? "" : "secondary"}`}
+                      key={choice.choice_key}
+                      disabled={busy}
+                      onClick={() => setCorrectChoice(choice.choice_key)}
+                    >
+                      {choice.choice_key}{" "}
+                      {choice.content_type === "TEXT" ? choice.text : choice.content_type}
+                    </button>
+                  ))}
+                </div>
+                <p>
+                  {state?.admin_correct_choice_set
+                    ? `現在の正解: ${state.admin_correct_choice}`
+                    : "正解が未設定です。正解発表前に設定してください。"}
+                </p>
+              </div>
+            )}
           <div className="admin-main-action">
             {phase === "NOT_STARTED" && <button className="btn" disabled={busy} onClick={nextQuestion}>次の問題へ</button>}
             {phase === "QUESTION_TRANSITION" && (
