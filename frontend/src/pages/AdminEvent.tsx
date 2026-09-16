@@ -19,11 +19,82 @@ const PHASE_LABEL: Record<string, string> = {
   RANKING: "ランキング表示中",
 };
 
-function hasNextQuestion(currentQuestion: MonitorState["question"], questions: QuestionAdminOut[]) {
-  const normalQuestions = questions.filter((q) => !q.is_practice);
-  if (!currentQuestion) return questions.length > 0;
-  if (currentQuestion.is_practice) return normalQuestions.length > 0;
-  return normalQuestions.some((q) => q.question_number > currentQuestion.question_number);
+function getNextQuestion(currentQuestion: QuestionAdminOut | null, questions: QuestionAdminOut[]) {
+  let nextQuestionNumber = 1;
+  if (currentQuestion) {
+    nextQuestionNumber = currentQuestion.question_number + 1;
+  } else if (questions.some((q) => q.is_practice)) {
+    nextQuestionNumber = 0;
+  }
+  return questions.find((q) => q.question_number === nextQuestionNumber) ?? null;
+}
+
+function getMediaLabel(mediaType: string | undefined) {
+  return mediaType && mediaType !== "NONE" ? mediaType : "なし";
+}
+
+function QuestionPreview({
+  title,
+  question,
+  emptyMessage = "次の問題はありません",
+}: {
+  readonly title: string;
+  readonly question: QuestionAdminOut | null;
+  readonly emptyMessage?: string;
+}) {
+  if (!question) {
+    return (
+      <section className="admin-question-preview admin-question-preview-empty">
+        <h3>{title}</h3>
+        <p>{emptyMessage}</p>
+      </section>
+    );
+  }
+
+  const correctChoice = question.choices.find((choice) => choice.choice_key === question.correct_choice);
+
+  return (
+    <section className="admin-question-preview">
+      <div className="admin-preview-heading">
+        <h3>{title}</h3>
+        <strong>{getQuestionLabel(question)}</strong>
+      </div>
+      <p className="admin-preview-question-text">{question.question_text}</p>
+      {question.question_media_type === "IMAGE" && question.question_media_url && (
+        <img className="admin-preview-image" src={mediaUrl(question.question_media_url)} alt="問題画像" />
+      )}
+      <div className="admin-preview-meta">
+        <span>制限時間: {question.time_limit_seconds}秒</span>
+        <span>
+          正解: {question.correct_choice}{" "}
+          {correctChoice?.content_type === "TEXT"
+            ? correctChoice.text
+            : <span className="admin-media-badge">{correctChoice?.content_type ?? "メディア"}</span>}
+        </span>
+      </div>
+      <ul className="admin-preview-choices">
+        {question.choices.map((choice) => (
+          <li key={choice.choice_key}>
+            <strong>{choice.choice_key}.</strong>{" "}
+            {choice.content_type === "TEXT" ? choice.text : (
+              <>
+                <span className="admin-media-badge">{choice.content_type}</span>
+                {choice.content_type === "IMAGE" && choice.media_url && (
+                  <img className="admin-choice-thumbnail" src={mediaUrl(choice.media_url)} alt={`${choice.choice_key}の画像`} />
+                )}
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+      <div className="admin-preview-media">
+        <strong>メディア</strong>
+        <span>問題表示中: {getMediaLabel(question.question_media_type)}</span>
+        <span>出題前: {getMediaLabel(question.pre_question_media_type)}</span>
+        <span>正解発表前: {getMediaLabel(question.pre_correct_media_type)}</span>
+      </div>
+    </section>
+  );
 }
 
 function getNextActionLabel(phase: string, hasNext: boolean, question: MonitorState["question"]) {
@@ -174,7 +245,9 @@ export default function AdminEvent() {
   const normalQuestions = questions.filter((q) => !q.is_practice);
   const phase = state?.phase ?? event.phase;
   const currentQuestion = state?.question ?? null;
-  const hasMoreQuestions = hasNextQuestion(currentQuestion, questions);
+  const currentQuestionDetails = questions.find((q) => q.id === currentQuestion?.id) ?? null;
+  const nextQuestionDetails = getNextQuestion(currentQuestionDetails, questions);
+  const hasMoreQuestions = nextQuestionDetails !== null;
   const rankingRevealRank = state?.ranking_reveal_rank ?? null;
   const nextActionLabel = phase === "RANKING"
     ? getRankingRevealNextLabel(rankingRevealRank)
@@ -406,24 +479,6 @@ export default function AdminEvent() {
             <span>接続中: {state?.connected_participant_count ?? "-"}</span>
             <span>回答数: {state?.answered_count ?? "-"}</span>
           </div>
-          {state?.question && (
-            <div className="card" style={{ background: "#f9fafb" }}>
-              <strong>{state.question.question_text}</strong>
-              {state.question.question_media_url && state.question.question_media_type === "IMAGE" && (
-                <div>
-                  <img alt="問題画像" src={mediaUrl(state.question.question_media_url)} style={{ maxWidth: 300 }} />
-                </div>
-              )}
-              <ul>
-                {state.question.choices.map((c) => (
-                  <li key={c.choice_key}>
-                    {c.choice_key}: {c.content_type === "TEXT" ? c.text : `[${c.content_type}] ${c.media_url}`}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
           <div className="admin-main-action">
             {phase === "NOT_STARTED" && <button className="btn" disabled={busy} onClick={nextQuestion}>次の問題へ</button>}
             {phase === "QUESTION_TRANSITION" && (
@@ -491,6 +546,11 @@ export default function AdminEvent() {
               )}
             </div>
           </details>
+
+          <div className="admin-question-previews">
+            <QuestionPreview title="現在の問題" question={currentQuestionDetails} emptyMessage="まだ問題は開始されていません" />
+            <QuestionPreview title="次の問題" question={nextQuestionDetails} />
+          </div>
 
           {state?.phase === "RANKING" && state.ranking && (
             <table style={{ marginTop: 16 }}>
