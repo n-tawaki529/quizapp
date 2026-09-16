@@ -62,6 +62,10 @@ class QuestionCreateRequest(BaseModel):
     question_text: str
     question_media_type: MediaType = MediaType.NONE
     question_media_url: str | None = None
+    pre_question_media_type: MediaType = MediaType.NONE
+    pre_question_media_url: str | None = None
+    pre_correct_media_type: MediaType = MediaType.NONE
+    pre_correct_media_url: str | None = None
     time_limit_seconds: int = 10
     correct_choice: ChoiceKey
     choices: list[ChoiceInput]
@@ -73,6 +77,10 @@ class QuestionUpdateRequest(BaseModel):
     question_text: str | None = None
     question_media_type: MediaType | None = None
     question_media_url: str | None = None
+    pre_question_media_type: MediaType | None = None
+    pre_question_media_url: str | None = None
+    pre_correct_media_type: MediaType | None = None
+    pre_correct_media_url: str | None = None
     time_limit_seconds: int | None = None
     correct_choice: ChoiceKey | None = None
     choices: list[ChoiceInput] | None = None
@@ -85,6 +93,10 @@ class QuestionAdminOut(BaseModel):
     question_text: str
     question_media_type: MediaType
     question_media_url: str | None
+    pre_question_media_type: MediaType
+    pre_question_media_url: str | None
+    pre_correct_media_type: MediaType
+    pre_correct_media_url: str | None
     time_limit_seconds: int
     correct_choice: ChoiceKey
     choices: list[ChoiceOut]

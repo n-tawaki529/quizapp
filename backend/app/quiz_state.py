@@ -163,12 +163,13 @@ def build_monitor_state(db: Session, event: Event, include_question_details: boo
         "correct_choice": None,
         "transition_question_number": None,
         "transition_is_practice": None,
+        "pre_media": None,
     }
     if question:
         state["transition_question_number"] = question.question_number
         state["transition_is_practice"] = question.is_practice
-        if event.phase != QuizPhase.QUESTION_TRANSITION or include_question_details:
-            state["question"] = {
+        if event.phase not in (QuizPhase.QUESTION_TRANSITION, QuizPhase.PRE_QUESTION_MEDIA) or include_question_details:
+            question_state = {
                 "id": str(question.id),
                 "question_number": question.question_number,
                 "question_text": question.question_text,
@@ -178,10 +179,32 @@ def build_monitor_state(db: Session, event: Event, include_question_details: boo
                 "choices": [build_choice_out(c) for c in question.choices],
                 "is_practice": question.is_practice,
             }
-        if event.phase.value in ("ANSWER_COUNT_SHOWN", "CORRECT_ANSWER_SHOWN"):
+            if include_question_details:
+                question_state.update(
+                    {
+                        "pre_question_media_type": question.pre_question_media_type.value,
+                        "pre_question_media_url": question.pre_question_media_url,
+                        "pre_correct_media_type": question.pre_correct_media_type.value,
+                        "pre_correct_media_url": question.pre_correct_media_url,
+                    }
+                )
+            state["question"] = question_state
+        if event.phase in (QuizPhase.ANSWER_COUNT_SHOWN, QuizPhase.PRE_CORRECT_MEDIA, QuizPhase.CORRECT_ANSWER_SHOWN):
             state["answer_counts"] = compute_answer_counts(db, question.id)
-        if event.phase.value == "CORRECT_ANSWER_SHOWN":
+        if event.phase == QuizPhase.CORRECT_ANSWER_SHOWN:
             state["correct_choice"] = question.correct_choice.value
+        if event.phase == QuizPhase.PRE_QUESTION_MEDIA:
+            state["pre_media"] = {
+                "media_type": question.pre_question_media_type.value,
+                "media_url": question.pre_question_media_url,
+                "timing": "before_question",
+            }
+        elif event.phase == QuizPhase.PRE_CORRECT_MEDIA:
+            state["pre_media"] = {
+                "media_type": question.pre_correct_media_type.value,
+                "media_url": question.pre_correct_media_url,
+                "timing": "before_correct_answer",
+            }
     if event.phase.value == "RANKING":
         state["ranking"] = compute_ranking(db, event.id, limit=settings.ranking_display_limit)
         state["ranking_reveal_rank"] = event.ranking_reveal_rank
@@ -240,7 +263,11 @@ def build_participant_state(db: Session, event: Event, participant_id: UUID | No
     if question:
         state["transition_question_number"] = question.question_number
         state["transition_is_practice"] = question.is_practice
-        if event.phase != QuizPhase.QUESTION_TRANSITION:
+        if event.phase not in (
+            QuizPhase.QUESTION_TRANSITION,
+            QuizPhase.PRE_QUESTION_MEDIA,
+            QuizPhase.PRE_CORRECT_MEDIA,
+        ):
             state["question"] = {
                 "id": str(question.id),
                 "question_number": question.question_number,

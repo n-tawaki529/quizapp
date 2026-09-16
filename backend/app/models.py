@@ -24,10 +24,12 @@ class EventStatus(str, enum.Enum):
 class QuizPhase(str, enum.Enum):
     NOT_STARTED = "NOT_STARTED"        # まだ問題が出題されていない
     QUESTION_TRANSITION = "QUESTION_TRANSITION"
+    PRE_QUESTION_MEDIA = "PRE_QUESTION_MEDIA"
     QUESTION_SHOWN = "QUESTION_SHOWN"  # 問題表示中、回答受付前
     ANSWER_OPEN = "ANSWER_OPEN"        # 回答受付中
     ANSWER_CLOSED = "ANSWER_CLOSED"    # 回答受付終了(まだ結果は見せない)
     ANSWER_COUNT_SHOWN = "ANSWER_COUNT_SHOWN"  # 各選択肢の回答人数を表示中(正解はまだ非公開)
+    PRE_CORRECT_MEDIA = "PRE_CORRECT_MEDIA"
     CORRECT_ANSWER_SHOWN = "CORRECT_ANSWER_SHOWN"  # 正解発表済み
     RANKING = "RANKING"                # ランキング表示中
 
@@ -36,6 +38,7 @@ class MediaType(str, enum.Enum):
     NONE = "NONE"
     IMAGE = "IMAGE"
     VIDEO = "VIDEO"
+    AUDIO = "AUDIO"
 
 
 class ChoiceContentType(str, enum.Enum):
@@ -99,6 +102,14 @@ class Question(Base):
         SAEnum(MediaType, name="question_media_type"), default=MediaType.NONE, nullable=False
     )
     question_media_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    pre_question_media_type: Mapped[MediaType] = mapped_column(
+        SAEnum(MediaType, name="question_media_type"), default=MediaType.NONE, nullable=False
+    )
+    pre_question_media_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    pre_correct_media_type: Mapped[MediaType] = mapped_column(
+        SAEnum(MediaType, name="question_media_type"), default=MediaType.NONE, nullable=False
+    )
+    pre_correct_media_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     time_limit_seconds: Mapped[int] = mapped_column(Integer, default=10, nullable=False)
     correct_choice: Mapped[ChoiceKey] = mapped_column(SAEnum(ChoiceKey, name="choice_key_correct"), nullable=False)
     is_practice: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

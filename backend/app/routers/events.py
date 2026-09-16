@@ -137,6 +137,10 @@ def duplicate_event(event_id: UUID, db: Session = Depends(get_db), _admin=Depend
             question_text=q.question_text,
             question_media_type=q.question_media_type,
             question_media_url=_copy_media(q.question_media_url),
+            pre_question_media_type=q.pre_question_media_type,
+            pre_question_media_url=_copy_media(q.pre_question_media_url),
+            pre_correct_media_type=q.pre_correct_media_type,
+            pre_correct_media_url=_copy_media(q.pre_correct_media_url),
             time_limit_seconds=q.time_limit_seconds,
             correct_choice=q.correct_choice,
             is_practice=q.is_practice,
@@ -222,6 +226,10 @@ def delete_event(event_id: UUID, db: Session = Depends(get_db), _admin=Depends(r
     for q in questions:
         if q.question_media_url:
             media_urls.append(q.question_media_url)
+        if q.pre_question_media_url:
+            media_urls.append(q.pre_question_media_url)
+        if q.pre_correct_media_url:
+            media_urls.append(q.pre_correct_media_url)
         for c in q.choices:
             if c.media_url:
                 media_urls.append(c.media_url)

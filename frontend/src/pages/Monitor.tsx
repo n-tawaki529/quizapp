@@ -80,6 +80,63 @@ export default function Monitor() {
     );
   }
 
+  const isPreMediaPhase = state.phase === "PRE_QUESTION_MEDIA" || state.phase === "PRE_CORRECT_MEDIA";
+  const isPreAudio = isPreMediaPhase && state.pre_media?.media_type === "AUDIO";
+
+  if (isPreMediaPhase && state.pre_media && !isPreAudio) {
+    const preMedia = state.pre_media;
+    return renderCanvas(
+      <div className="monitor-pre-media">
+        {preMedia.media_type === "IMAGE" && (
+          <img className="monitor-pre-media-content" src={mediaUrl(preMedia.media_url)} alt="" />
+        )}
+        {preMedia.media_type === "VIDEO" && (
+          <video
+            className="monitor-pre-media-content"
+            src={mediaUrl(preMedia.media_url)}
+            controls
+            autoPlay
+            playsInline
+            preload="auto"
+          >
+            <track kind="captions" />
+          </video>
+        )}
+      </div>,
+    );
+  }
+
+  const preAudio = isPreAudio && state.pre_media ? (
+    <audio
+      key={`${state.phase}:${state.pre_media.media_url}`}
+      className="monitor-pre-audio"
+      src={mediaUrl(state.pre_media.media_url)}
+      controls
+      autoPlay
+    >
+      <track kind="captions" />
+    </audio>
+  ) : null;
+
+  const preAudioControls = preAudio ? <div className="monitor-pre-audio-controls">{preAudio}</div> : null;
+
+  if (state.phase === "PRE_QUESTION_MEDIA" && isPreAudio) {
+    let title = "";
+    if (state.transition_is_practice) {
+      title = "練習問題";
+    } else if (state.transition_question_number !== null) {
+      title = `第${state.transition_question_number}問`;
+    }
+    return renderCanvas(
+      <>
+        <div className="monitor-transition">
+          <h1 className="monitor-transition-title">{title}</h1>
+        </div>
+        {preAudioControls}
+      </>,
+    );
+  }
+
   const q = state.question;
   // Choiceの content_type が全てTEXTなら文章問題(縦並び)、それ以外は選択肢数別のグリッドにする。
   const isMediaChoices = !!q && q.choices.some((c) => c.content_type !== "TEXT");
@@ -102,15 +159,18 @@ export default function Monitor() {
 
   return renderCanvas(
     <>
+      {preAudio}
       {!connected && <p style={{ color: "#b91c1c" }}>サーバーとの接続が切れています。再接続を試みています...</p>}
       {!q && <h1 className="monitor-question-text">{state.event_name ?? "クイズ大会"}</h1>}
       {q && (
         <>
           {q.question_media_type === "IMAGE" && q.question_media_url && !isImageTextChoices && (
-            <img className="monitor-media" src={mediaUrl(q.question_media_url)} />
+            <img className="monitor-media" src={mediaUrl(q.question_media_url)} alt="問題画像" />
           )}
           {q.question_media_type === "VIDEO" && q.question_media_url && (
-            <video className="monitor-media" src={mediaUrl(q.question_media_url)} controls autoPlay />
+            <video className="monitor-media" src={mediaUrl(q.question_media_url)} controls autoPlay playsInline>
+              <track kind="captions" />
+            </video>
           )}
 
           <div className={`monitor-main${isImageTextChoices ? " monitor-main-image-text" : ""}`}>
@@ -145,6 +205,7 @@ export default function Monitor() {
           </div>
         </>
       )}
+      {preAudioControls}
     </>,
   );
 }

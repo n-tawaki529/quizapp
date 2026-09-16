@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     media_storage_backend: str = "local"
     media_local_dir: str = "./media"
     media_base_url: str = "/media"
+    media_max_size_bytes: int = 50 * 1024 * 1024
 
     # S3移行時に使用する設定 (media_storage_backend=s3 の場合)
     s3_bucket: str = ""

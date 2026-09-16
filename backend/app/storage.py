@@ -54,9 +54,17 @@ class LocalMediaStorage(MediaStorage):
         suffix = Path(file.filename or "").suffix
         filename = f"{uuid.uuid4().hex}{suffix}"
         dest = self.base_dir / filename
-        with dest.open("wb") as out:
-            while chunk := file.file.read(1024 * 1024):
-                out.write(chunk)
+        total = 0
+        try:
+            with dest.open("wb") as out:
+                while chunk := file.file.read(1024 * 1024):
+                    total += len(chunk)
+                    if total > settings.media_max_size_bytes:
+                        raise ValueError("メディアファイルは50MB以下にしてください")
+                    out.write(chunk)
+        except Exception:
+            dest.unlink(missing_ok=True)
+            raise
         return f"{self.base_url}/{filename}"
 
     def delete(self, url: str) -> None:

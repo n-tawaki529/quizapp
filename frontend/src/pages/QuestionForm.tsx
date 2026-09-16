@@ -53,6 +53,10 @@ export default function QuestionForm({
   const [questionText, setQuestionText] = useState(initial?.question_text ?? "");
   const [questionMediaType, setQuestionMediaType] = useState<MediaType>(initial?.question_media_type ?? "NONE");
   const [questionMediaUrl, setQuestionMediaUrl] = useState(initial?.question_media_url ?? "");
+  const [preQuestionMediaType, setPreQuestionMediaType] = useState<MediaType>(initial?.pre_question_media_type ?? "NONE");
+  const [preQuestionMediaUrl, setPreQuestionMediaUrl] = useState(initial?.pre_question_media_url ?? "");
+  const [preCorrectMediaType, setPreCorrectMediaType] = useState<MediaType>(initial?.pre_correct_media_type ?? "NONE");
+  const [preCorrectMediaUrl, setPreCorrectMediaUrl] = useState(initial?.pre_correct_media_url ?? "");
   const [timeLimit, setTimeLimit] = useState(initial?.time_limit_seconds ?? 10);
   const [choiceCount, setChoiceCount] = useState<ChoiceCount>(
     initial && initial.choices.length >= 2 && initial.choices.length <= 4 ? (initial.choices.length as ChoiceCount) : 4,
@@ -86,6 +90,19 @@ export default function QuestionForm({
     }
   }
 
+  async function handleTimedMediaUpload(timing: "preQuestion" | "preCorrect", file: File) {
+    setUploadingKey(timing);
+    try {
+      const res = await adminApi.uploadMedia(file);
+      if (timing === "preQuestion") setPreQuestionMediaUrl(res.url);
+      else setPreCorrectMediaUrl(res.url);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setUploadingKey(null);
+    }
+  }
+
   async function handleChoiceMediaUpload(key: ChoiceKey, file: File) {
     setUploadingKey(key);
     try {
@@ -108,6 +125,10 @@ export default function QuestionForm({
         question_text: questionText,
         question_media_type: questionMediaType,
         question_media_url: questionMediaType === "NONE" ? null : questionMediaUrl || null,
+        pre_question_media_type: preQuestionMediaType,
+        pre_question_media_url: preQuestionMediaType === "NONE" ? null : preQuestionMediaUrl || null,
+        pre_correct_media_type: preCorrectMediaType,
+        pre_correct_media_url: preCorrectMediaType === "NONE" ? null : preCorrectMediaUrl || null,
         time_limit_seconds: timeLimit,
         correct_choice: correctChoice,
         is_practice: isPractice,
@@ -189,7 +210,7 @@ export default function QuestionForm({
       </div>
 
       <div className="field">
-        <label>問題に添付するメディア(任意・会場モニターのみに表示)</label>
+        <label>問題表示中のメディア(任意・会場モニターのみに表示)</label>
         <select value={questionMediaType} onChange={(e) => setQuestionMediaType(e.target.value as MediaType)}>
           <option value="NONE">なし</option>
           <option value="IMAGE">画像</option>
@@ -211,6 +232,45 @@ export default function QuestionForm({
           </div>
         )}
       </div>
+
+      {(["preQuestion", "preCorrect"] as const).map((timing) => {
+        const isPreQuestion = timing === "preQuestion";
+        const mediaType = isPreQuestion ? preQuestionMediaType : preCorrectMediaType;
+        const mediaUrlValue = isPreQuestion ? preQuestionMediaUrl : preCorrectMediaUrl;
+        const setMediaType = isPreQuestion ? setPreQuestionMediaType : setPreCorrectMediaType;
+        return (
+          <div className="field" key={timing}>
+            <label>{isPreQuestion ? "出題前メディア" : "正解発表前メディア"}(任意・会場モニターのみ)</label>
+            <select value={mediaType} onChange={(e) => setMediaType(e.target.value as MediaType)}>
+              <option value="NONE">なし</option>
+              <option value="IMAGE">画像</option>
+              <option value="VIDEO">動画</option>
+              <option value="AUDIO">音声</option>
+            </select>
+            {mediaType !== "NONE" && (
+              <div className="row" style={{ marginTop: 6 }}>
+                <input
+                  type="file"
+                  accept={
+                    mediaType === "IMAGE"
+                      ? "image/jpeg,image/png,image/webp"
+                      : mediaType === "VIDEO"
+                        ? "video/mp4"
+                        : "audio/mpeg"
+                  }
+                  onChange={(e) => e.target.files && handleTimedMediaUpload(timing, e.target.files[0])}
+                />
+                {uploadingKey === timing && <span>アップロード中...</span>}
+                {mediaUrlValue && (
+                  <a href={mediaUrl(mediaUrlValue)} target="_blank" rel="noreferrer">
+                    現在のメディアをプレビュー
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
 
       <h4>選択肢(会場モニターにのみ内容を表示。参加者には選択肢の数に応じたボタンのみ表示)</h4>
       {CHOICE_KEYS.slice(0, choiceCount).map((key) => (

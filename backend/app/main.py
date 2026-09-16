@@ -1,9 +1,11 @@
 import asyncio
 import logging
+import mimetypes
+from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from sqlalchemy import text
 
 from .config import get_settings
@@ -36,7 +38,74 @@ app.include_router(ws.router)
 import os
 
 os.makedirs(settings.media_local_dir, exist_ok=True)
-app.mount(settings.media_base_url, StaticFiles(directory=settings.media_local_dir), name="media")
+
+
+def _media_path(filename: str) -> Path | None:
+    base_dir = Path(settings.media_local_dir).resolve()
+    path = (base_dir / filename).resolve()
+    if base_dir not in path.parents or not path.is_file():
+        return None
+    return path
+
+
+def _parse_range(range_header: str | None, file_size: int) -> tuple[int, int] | None:
+    if not range_header:
+        return None
+    if not range_header.startswith("bytes=") or "," in range_header:
+        return (-1, -1)
+    start_text, separator, end_text = range_header[6:].partition("-")
+    if not separator:
+        return (-1, -1)
+    try:
+        if not start_text:
+            suffix_length = int(end_text)
+            if suffix_length <= 0:
+                return (-1, -1)
+            return (max(0, file_size - suffix_length), file_size - 1)
+        start = int(start_text)
+        end = int(end_text) if end_text else file_size - 1
+    except ValueError:
+        return (-1, -1)
+    if start < 0 or start >= file_size or end < start:
+        return (-1, -1)
+    return (start, min(end, file_size - 1))
+
+
+@app.api_route("/media/{filename:path}", methods=["GET", "HEAD"], name="media")
+def media_file(filename: str, request: Request):
+    path = _media_path(filename)
+    if path is None:
+        return Response(status_code=404)
+
+    file_size = path.stat().st_size
+    content_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    byte_range = _parse_range(request.headers.get("range"), file_size)
+    common_headers = {"Accept-Ranges": "bytes"}
+
+    if byte_range == (-1, -1):
+        return Response(status_code=416, headers={**common_headers, "Content-Range": f"bytes */{file_size}"})
+    if byte_range is None:
+        return FileResponse(path, media_type=content_type, headers=common_headers)
+
+    start, end = byte_range
+
+    def iter_file():
+        with path.open("rb") as file:
+            file.seek(start)
+            remaining = end - start + 1
+            while remaining:
+                chunk = file.read(min(1024 * 1024, remaining))
+                if not chunk:
+                    break
+                remaining -= len(chunk)
+                yield chunk
+
+    headers = {
+        **common_headers,
+        "Content-Range": f"bytes {start}-{end}/{file_size}",
+        "Content-Length": str(end - start + 1),
+    }
+    return StreamingResponse(iter_file(), status_code=206, media_type=content_type, headers=headers)
 
 
 @app.on_event("startup")
@@ -44,6 +113,7 @@ def on_startup():
     Base.metadata.create_all(bind=engine)
     _ensure_quiz_phase_enum_values()
     _ensure_question_practice_column()
+    _ensure_question_media_columns()
     _ensure_ranking_reveal_column()
     manager.set_loop(asyncio.get_event_loop())
 
@@ -54,8 +124,15 @@ def _ensure_quiz_phase_enum_values() -> None:
     """
     with engine.connect() as conn:
         conn = conn.execution_options(isolation_level="AUTOCOMMIT")
-        for value in ("QUESTION_TRANSITION", "ANSWER_COUNT_SHOWN", "CORRECT_ANSWER_SHOWN"):
+        for value in (
+            "QUESTION_TRANSITION",
+            "PRE_QUESTION_MEDIA",
+            "ANSWER_COUNT_SHOWN",
+            "PRE_CORRECT_MEDIA",
+            "CORRECT_ANSWER_SHOWN",
+        ):
             conn.execute(text(f"ALTER TYPE quiz_phase ADD VALUE IF NOT EXISTS '{value}'"))
+        conn.execute(text("ALTER TYPE question_media_type ADD VALUE IF NOT EXISTS 'AUDIO'"))
 
 
 def _ensure_question_practice_column() -> None:
@@ -73,6 +150,15 @@ def _ensure_ranking_reveal_column() -> None:
     with engine.connect() as conn:
         conn = conn.execution_options(isolation_level="AUTOCOMMIT")
         conn.execute(text("ALTER TABLE events ADD COLUMN IF NOT EXISTS ranking_reveal_rank INTEGER"))
+
+
+def _ensure_question_media_columns() -> None:
+    with engine.connect() as conn:
+        conn = conn.execution_options(isolation_level="AUTOCOMMIT")
+        conn.execute(text("ALTER TABLE questions ADD COLUMN IF NOT EXISTS pre_question_media_type question_media_type NOT NULL DEFAULT 'NONE'"))
+        conn.execute(text("ALTER TABLE questions ADD COLUMN IF NOT EXISTS pre_question_media_url VARCHAR(1000)"))
+        conn.execute(text("ALTER TABLE questions ADD COLUMN IF NOT EXISTS pre_correct_media_type question_media_type NOT NULL DEFAULT 'NONE'"))
+        conn.execute(text("ALTER TABLE questions ADD COLUMN IF NOT EXISTS pre_correct_media_url VARCHAR(1000)"))
 
 
 @app.get("/api/health")

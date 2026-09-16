@@ -7,6 +7,7 @@ from ..database import get_db
 from ..models import Choice, ChoiceKey, Event, Question
 from ..schemas import QuestionAdminOut, QuestionCreateRequest, QuestionUpdateRequest, ReorderRequest
 from ..security import require_admin
+from ..storage import get_media_storage
 
 router = APIRouter(prefix="/api/admin/events/{event_id}/questions", tags=["questions"])
 
@@ -16,6 +17,21 @@ CHOICE_KEY_SETS = {
     3: {ChoiceKey.A, ChoiceKey.B, ChoiceKey.C},
     4: {ChoiceKey.A, ChoiceKey.B, ChoiceKey.C, ChoiceKey.D},
 }
+
+
+def _delete_unreferenced_media(db: Session, urls: set[str]) -> None:
+    storage = get_media_storage()
+    for url in urls:
+        still_used = (
+            db.query(Question).filter(
+                (Question.question_media_url == url)
+                | (Question.pre_question_media_url == url)
+                | (Question.pre_correct_media_url == url)
+            ).first()
+            or db.query(Choice).filter(Choice.media_url == url).first()
+        )
+        if not still_used:
+            storage.delete(url)
 
 
 def _get_event_or_404(db: Session, event_id: UUID) -> Event:
@@ -90,6 +106,10 @@ def create_question(
         question_text=body.question_text,
         question_media_type=body.question_media_type,
         question_media_url=body.question_media_url,
+        pre_question_media_type=body.pre_question_media_type,
+        pre_question_media_url=body.pre_question_media_url,
+        pre_correct_media_type=body.pre_correct_media_type,
+        pre_correct_media_url=body.pre_correct_media_url,
         time_limit_seconds=body.time_limit_seconds,
         correct_choice=body.correct_choice,
         is_practice=body.is_practice,
@@ -116,6 +136,16 @@ def update_question(
     question = db.get(Question, question_id)
     if question is None or question.event_id != event_id:
         raise HTTPException(status_code=404, detail="問題が見つかりません")
+    old_media_urls = {
+        url
+        for url in (
+            question.question_media_url,
+            question.pre_question_media_url,
+            question.pre_correct_media_url,
+            *(choice.media_url for choice in question.choices),
+        )
+        if url
+    }
 
     if body.is_practice is True and not question.is_practice:
         # 他に練習問題が存在しないことを確認してから練習問題化する
@@ -161,8 +191,16 @@ def update_question(
         question.question_text = body.question_text
     if body.question_media_type is not None:
         question.question_media_type = body.question_media_type
-    if body.question_media_url is not None:
+    if "question_media_url" in body.model_fields_set:
         question.question_media_url = body.question_media_url
+    if body.pre_question_media_type is not None:
+        question.pre_question_media_type = body.pre_question_media_type
+    if "pre_question_media_url" in body.model_fields_set:
+        question.pre_question_media_url = body.pre_question_media_url
+    if body.pre_correct_media_type is not None:
+        question.pre_correct_media_type = body.pre_correct_media_type
+    if "pre_correct_media_url" in body.model_fields_set:
+        question.pre_correct_media_url = body.pre_correct_media_url
     if body.time_limit_seconds is not None:
         question.time_limit_seconds = body.time_limit_seconds
     if body.correct_choice is not None:
@@ -191,6 +229,7 @@ def update_question(
 
     db.commit()
     db.refresh(question)
+    _delete_unreferenced_media(db, old_media_urls)
     return question
 
 
@@ -202,8 +241,19 @@ def delete_question(
     question = db.get(Question, question_id)
     if question is None or question.event_id != event_id:
         raise HTTPException(status_code=404, detail="問題が見つかりません")
+    media_urls = {
+        url
+        for url in (
+            question.question_media_url,
+            question.pre_question_media_url,
+            question.pre_correct_media_url,
+            *(choice.media_url for choice in question.choices),
+        )
+        if url
+    }
     db.delete(question)
     db.commit()
+    _delete_unreferenced_media(db, media_urls)
     return None
 
 

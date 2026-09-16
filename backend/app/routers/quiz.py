@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from ..database import SessionLocal, get_db
 from ..config import get_settings
-from ..models import Answer, Event, EventStatus, Participant, Question, QuizPhase
+from ..models import Answer, Event, EventStatus, MediaType, Participant, Question, QuizPhase
 from ..quiz_state import build_admin_state, build_monitor_state, build_participant_state, compute_ranking
 from ..schemas import AnswerRequest, AnswerResult, RankingResponse
 from ..security import require_admin, require_participant
@@ -98,7 +98,7 @@ def _advance_to_next_question(db: Session, event: Event) -> Question:
 @router.post("/api/admin/events/{event_id}/show-question")
 def show_question(event_id: UUID, db: Session = Depends(get_db), _admin=Depends(require_admin)):
     event = _get_event_or_404(db, event_id)
-    if event.phase != QuizPhase.QUESTION_TRANSITION:
+    if event.phase not in (QuizPhase.QUESTION_TRANSITION, QuizPhase.PRE_QUESTION_MEDIA):
         raise HTTPException(status_code=422, detail="問題を表示できる状態ではありません")
     event.phase = QuizPhase.QUESTION_SHOWN
     db.commit()
@@ -107,6 +107,20 @@ def show_question(event_id: UUID, db: Session = Depends(get_db), _admin=Depends(
     _broadcast_current_state(db, event)
     return {"ok": True}
 
+
+@router.post("/api/admin/events/{event_id}/show-pre-question-media")
+def show_pre_question_media(event_id: UUID, db: Session = Depends(get_db), _admin=Depends(require_admin)):
+    event = _get_event_or_404(db, event_id)
+    if event.phase != QuizPhase.QUESTION_TRANSITION:
+        raise HTTPException(status_code=422, detail="出題前メディアを表示できる状態ではありません")
+    question = db.get(Question, event.current_question_id) if event.current_question_id else None
+    if question is None or question.pre_question_media_type == MediaType.NONE or not question.pre_question_media_url:
+        raise HTTPException(status_code=422, detail="出題前メディアが設定されていません")
+    event.phase = QuizPhase.PRE_QUESTION_MEDIA
+    db.commit()
+    db.refresh(event)
+    _broadcast_current_state(db, event)
+    return {"ok": True}
 
 def _open_answer_window(event: Event, question: Question) -> None:
     """回答受付を開始し、制限時間の締切と計測開始時刻を記録する。"""
@@ -156,7 +170,7 @@ def show_question_and_start_answer(
     event = _get_event_or_404(db, event_id)
     if event.current_question_id is None:
         raise HTTPException(status_code=422, detail="表示中の問題がありません")
-    if event.phase != QuizPhase.QUESTION_TRANSITION:
+    if event.phase not in (QuizPhase.QUESTION_TRANSITION, QuizPhase.PRE_QUESTION_MEDIA):
         raise HTTPException(status_code=422, detail="問題を表示して回答受付を開始できる状態ではありません")
 
     question = db.get(Question, event.current_question_id)
@@ -193,12 +207,27 @@ def show_answer_count(event_id: UUID, db: Session = Depends(get_db), _admin=Depe
 def show_correct_answer(event_id: UUID, db: Session = Depends(get_db), _admin=Depends(require_admin)):
     """回答人数表示後、正解を会場モニターに発表する。"""
     event = _get_event_or_404(db, event_id)
-    if event.phase != QuizPhase.ANSWER_COUNT_SHOWN:
+    if event.phase not in (QuizPhase.ANSWER_COUNT_SHOWN, QuizPhase.PRE_CORRECT_MEDIA):
         raise HTTPException(status_code=422, detail="回答結果を表示してから実行してください")
     event.phase = QuizPhase.CORRECT_ANSWER_SHOWN
     db.commit()
     db.refresh(event)
 
+    _broadcast_current_state(db, event)
+    return {"ok": True}
+
+
+@router.post("/api/admin/events/{event_id}/show-pre-correct-media")
+def show_pre_correct_media(event_id: UUID, db: Session = Depends(get_db), _admin=Depends(require_admin)):
+    event = _get_event_or_404(db, event_id)
+    if event.phase != QuizPhase.ANSWER_COUNT_SHOWN:
+        raise HTTPException(status_code=422, detail="正解発表前メディアを表示できる状態ではありません")
+    question = db.get(Question, event.current_question_id) if event.current_question_id else None
+    if question is None or question.pre_correct_media_type == MediaType.NONE or not question.pre_correct_media_url:
+        raise HTTPException(status_code=422, detail="正解発表前メディアが設定されていません")
+    event.phase = QuizPhase.PRE_CORRECT_MEDIA
+    db.commit()
+    db.refresh(event)
     _broadcast_current_state(db, event)
     return {"ok": True}
 

@@ -9,10 +9,12 @@ import QuestionForm from "./QuestionForm";
 const PHASE_LABEL: Record<string, string> = {
   NOT_STARTED: "未開始",
   QUESTION_TRANSITION: "問題切替",
+  PRE_QUESTION_MEDIA: "出題前メディア表示中",
   QUESTION_SHOWN: "回答待機中",
   ANSWER_OPEN: "回答受付中",
   ANSWER_CLOSED: "回答受付終了",
   ANSWER_COUNT_SHOWN: "回答人数表示中",
+  PRE_CORRECT_MEDIA: "正解発表前メディア表示中",
   CORRECT_ANSWER_SHOWN: "正解発表済み",
   RANKING: "ランキング表示中",
 };
@@ -24,7 +26,7 @@ function hasNextQuestion(currentQuestion: MonitorState["question"], questions: Q
   return normalQuestions.some((q) => q.question_number > currentQuestion.question_number);
 }
 
-function getNextActionLabel(phase: string, hasNext: boolean) {
+function getNextActionLabel(phase: string, hasNext: boolean, question: MonitorState["question"]) {
   const labels: Record<string, string> = {
     NOT_STARTED: "次の問題へ",
     QUESTION_TRANSITION: "問題を表示＋回答開始",
@@ -34,6 +36,14 @@ function getNextActionLabel(phase: string, hasNext: boolean) {
     ANSWER_COUNT_SHOWN: "正解発表",
     RANKING: "終了",
   };
+  if (phase === "QUESTION_TRANSITION" && question?.pre_question_media_type && question.pre_question_media_type !== "NONE") {
+    return "出題前メディアを表示";
+  }
+  if (phase === "ANSWER_COUNT_SHOWN" && question?.pre_correct_media_type && question.pre_correct_media_type !== "NONE") {
+    return "正解発表前メディアを表示";
+  }
+  if (phase === "PRE_QUESTION_MEDIA") return "問題を表示＋回答開始";
+  if (phase === "PRE_CORRECT_MEDIA") return "正解発表";
   if (phase === "CORRECT_ANSWER_SHOWN") return hasNext ? "次の問題へ" : "ランキング表示";
   return labels[phase] ?? "終了";
 }
@@ -168,7 +178,9 @@ export default function AdminEvent() {
   const rankingRevealRank = state?.ranking_reveal_rank ?? null;
   const nextActionLabel = phase === "RANKING"
     ? getRankingRevealNextLabel(rankingRevealRank)
-    : getNextActionLabel(phase, hasMoreQuestions);
+    : getNextActionLabel(phase, hasMoreQuestions, currentQuestion);
+  const hasPreQuestionMedia = currentQuestion?.pre_question_media_type !== undefined && currentQuestion.pre_question_media_type !== "NONE";
+  const hasPreCorrectMedia = currentQuestion?.pre_correct_media_type !== undefined && currentQuestion.pre_correct_media_type !== "NONE";
   const interruptAnswerConfirm =
     phase === "ANSWER_OPEN"
       ? "回答受付中です。進めると現在の回答受付が中断されます。よろしいですか?"
@@ -177,13 +189,19 @@ export default function AdminEvent() {
   const showQuestion = () =>
     runAction(
       () => adminApi.post(`/api/admin/events/${eventId}/show-question`),
-      "問題内容を会場モニターに表示します。よろしいですか?"
+      phase === "QUESTION_TRANSITION" && hasPreQuestionMedia
+        ? "出題前メディアを表示せず、問題を表示します。よろしいですか?"
+        : "問題内容を会場モニターに表示します。よろしいですか?"
     );
   const showQuestionAndStartAnswer = () =>
     runAction(
       () => adminApi.post(`/api/admin/events/${eventId}/show-question-and-start-answer`),
-      "問題を表示して回答受付を開始します。よろしいですか?"
+      phase === "QUESTION_TRANSITION" && hasPreQuestionMedia
+        ? "出題前メディアを表示せず、問題を表示して回答受付を開始します。よろしいですか?"
+        : "問題を表示して回答受付を開始します。よろしいですか?"
     );
+  const showPreQuestionMedia = () =>
+    runAction(() => adminApi.post(`/api/admin/events/${eventId}/show-pre-question-media`), "出題前メディアを表示します。よろしいですか?");
   const nextQuestion = () =>
     runAction(() => adminApi.post(`/api/admin/events/${eventId}/next`), interruptAnswerConfirm);
   const startAnswer = () =>
@@ -206,8 +224,12 @@ export default function AdminEvent() {
   const showCorrectAnswer = () =>
     runAction(
       () => adminApi.post(`/api/admin/events/${eventId}/show-correct-answer`),
-      "正解を発表します。よろしいですか?"
+      phase === "ANSWER_COUNT_SHOWN" && hasPreCorrectMedia
+        ? "正解発表前メディアを表示せず、正解を発表します。よろしいですか?"
+        : "正解を発表します。よろしいですか?"
     );
+  const showPreCorrectMedia = () =>
+    runAction(() => adminApi.post(`/api/admin/events/${eventId}/show-pre-correct-media`), "正解発表前メディアを表示します。よろしいですか?");
   const showRanking = () =>
     runAction(
       () => adminApi.post(`/api/admin/events/${eventId}/show-ranking`),
@@ -405,12 +427,20 @@ export default function AdminEvent() {
           <div className="admin-main-action">
             {phase === "NOT_STARTED" && <button className="btn" disabled={busy} onClick={nextQuestion}>次の問題へ</button>}
             {phase === "QUESTION_TRANSITION" && (
-              <button className="btn" disabled={busy} onClick={showQuestionAndStartAnswer}>問題を表示＋回答開始</button>
+              hasPreQuestionMedia
+                ? <button className="btn" disabled={busy} onClick={showPreQuestionMedia}>出題前メディアを表示</button>
+                : <button className="btn" disabled={busy} onClick={showQuestionAndStartAnswer}>問題を表示＋回答開始</button>
             )}
+            {phase === "PRE_QUESTION_MEDIA" && <button className="btn" disabled={busy} onClick={showQuestionAndStartAnswer}>問題を表示＋回答開始</button>}
             {phase === "QUESTION_SHOWN" && <button className="btn" disabled={busy} onClick={startAnswer}>回答開始</button>}
             {phase === "ANSWER_OPEN" && <p className="admin-waiting-message">回答受付中です。制限時間終了後に自動で締め切ります。</p>}
             {phase === "ANSWER_CLOSED" && <button className="btn" disabled={busy} onClick={showAnswerCount}>回答結果を表示</button>}
-            {phase === "ANSWER_COUNT_SHOWN" && <button className="btn" disabled={busy} onClick={showCorrectAnswer}>正解発表</button>}
+            {phase === "ANSWER_COUNT_SHOWN" && (
+              hasPreCorrectMedia
+                ? <button className="btn" disabled={busy} onClick={showPreCorrectMedia}>正解発表前メディアを表示</button>
+                : <button className="btn" disabled={busy} onClick={showCorrectAnswer}>正解発表</button>
+            )}
+            {phase === "PRE_CORRECT_MEDIA" && <button className="btn" disabled={busy} onClick={showCorrectAnswer}>正解発表</button>}
             {phase === "CORRECT_ANSWER_SHOWN" && (
               hasMoreQuestions ? <button className="btn" disabled={busy} onClick={nextQuestion}>次の問題へ</button> :
                 <button className="btn" disabled={busy} onClick={showRanking}>ランキング表示</button>
@@ -441,7 +471,8 @@ export default function AdminEvent() {
               {phase !== "NOT_STARTED" && phase !== "CORRECT_ANSWER_SHOWN" && (
                 <button className="btn secondary" disabled={busy} onClick={nextQuestion}>次の問題へ</button>
               )}
-              {phase !== "QUESTION_TRANSITION" && (
+              {((phase !== "QUESTION_TRANSITION" && phase !== "PRE_QUESTION_MEDIA") ||
+                (phase === "QUESTION_TRANSITION" && hasPreQuestionMedia)) && (
                 <button className="btn secondary" disabled={busy} onClick={showQuestionAndStartAnswer}>問題を表示＋回答開始</button>
               )}
               {phase !== "QUESTION_SHOWN" && (
@@ -451,7 +482,8 @@ export default function AdminEvent() {
               {phase !== "ANSWER_CLOSED" && (
                 <button className="btn secondary" disabled={busy} onClick={showAnswerCount}>回答結果を表示</button>
               )}
-              {phase !== "ANSWER_COUNT_SHOWN" && (
+              {((phase !== "ANSWER_COUNT_SHOWN" && phase !== "PRE_CORRECT_MEDIA") ||
+                (phase === "ANSWER_COUNT_SHOWN" && hasPreCorrectMedia)) && (
                 <button className="btn secondary" disabled={busy} onClick={showCorrectAnswer}>正解発表</button>
               )}
               {(phase !== "CORRECT_ANSWER_SHOWN" || hasMoreQuestions) && (

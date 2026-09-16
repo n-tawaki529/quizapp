@@ -2,15 +2,17 @@ export type EventStatus = "CREATED" | "WAITING" | "RUNNING" | "FINISHED";
 export type QuizPhase =
   | "NOT_STARTED"
   | "QUESTION_TRANSITION"
+  | "PRE_QUESTION_MEDIA"
   | "QUESTION_SHOWN"
   | "ANSWER_OPEN"
   | "ANSWER_CLOSED"
   | "ANSWER_COUNT_SHOWN"
+  | "PRE_CORRECT_MEDIA"
   | "CORRECT_ANSWER_SHOWN"
   | "RANKING";
 
 export type ChoiceKey = "A" | "B" | "C" | "D";
-export type MediaType = "NONE" | "IMAGE" | "VIDEO";
+export type MediaType = "NONE" | "IMAGE" | "VIDEO" | "AUDIO";
 export type ChoiceContentType = "TEXT" | "IMAGE" | "VIDEO";
 
 export interface EventSummary {
@@ -40,6 +42,10 @@ export interface QuestionAdminOut {
   question_text: string;
   question_media_type: MediaType;
   question_media_url: string | null;
+  pre_question_media_type: MediaType;
+  pre_question_media_url: string | null;
+  pre_correct_media_type: MediaType;
+  pre_correct_media_url: string | null;
   time_limit_seconds: number;
   correct_choice: ChoiceKey;
   choices: ChoiceOut[];
@@ -60,6 +66,10 @@ export interface MonitorQuestionState {
   question_text: string;
   question_media_type: MediaType;
   question_media_url: string | null;
+  pre_question_media_type?: MediaType;
+  pre_question_media_url?: string | null;
+  pre_correct_media_type?: MediaType;
+  pre_correct_media_url?: string | null;
   time_limit_seconds: number;
   choices: ChoiceOut[];
   is_practice: boolean;
@@ -79,6 +89,11 @@ export interface MonitorState {
   question: MonitorQuestionState | null;
   transition_question_number: number | null;
   transition_is_practice: boolean | null;
+  pre_media: {
+    media_type: MediaType;
+    media_url: string;
+    timing: "before_question" | "before_correct_answer";
+  } | null;
   ranking: RankingEntry[] | null;
   ranking_reveal_rank: number | null;
   answer_counts: Partial<Record<ChoiceKey, number>> | null;
