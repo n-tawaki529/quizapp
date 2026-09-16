@@ -197,6 +197,7 @@ export default function Monitor() {
                       state.correct_choice !== null &&
                       state.correct_choice !== c.choice_key
                     }
+                    phase={state.phase}
                   />
                 ))}
               </div>

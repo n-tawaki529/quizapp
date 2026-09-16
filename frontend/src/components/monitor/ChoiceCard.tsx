@@ -1,6 +1,6 @@
-import { memo } from "react";
+import { memo, useEffect, useRef } from "react";
 import { mediaUrl } from "../../api";
-import { ChoiceKey, ChoiceOut } from "../../types";
+import { ChoiceKey, ChoiceOut, QuizPhase } from "../../types";
 
 // 会場モニター専用の色順(参加者スマホ画面の --color-a〜d とは別定義)。
 // A/1:青 B/2:赤 C/3:緑 D/4:黄
@@ -8,16 +8,25 @@ const COLOR_CLASS: Record<ChoiceKey, string> = { A: "color-a", B: "color-b", C: 
 export const CHOICE_LABEL: Record<ChoiceKey, string> = { A: "1", B: "2", C: "3", D: "4" };
 
 interface Props {
-  choice: ChoiceOut;
+  readonly choice: ChoiceOut;
   /** "text": 文章問題(縦並び) / "media": 画像・動画問題(2x2) */
-  variant: "text" | "media";
+  readonly variant: "text" | "media";
   /** 回答人数(ANSWER_COUNT_SHOWN以降のみ)。既存のMonitor.tsxの表示条件をそのまま引き継ぐ。単位は付けず数字のみ表示する。 */
-  count?: number | null;
+  readonly count?: number | null;
   /** 不正解として全体を暗く表示するか(CORRECT_ANSWER_SHOWN時、正解以外の3択がtrueになる)。 */
-  dim?: boolean;
+  readonly dim?: boolean;
+  readonly phase: QuizPhase;
 }
 
-function ChoiceCard({ choice, variant, count, dim }: Props) {
+function ChoiceCard({ choice, variant, count, dim, phase }: Props) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (choice.content_type === "VIDEO" && phase !== "ANSWER_OPEN") {
+      videoRef.current?.pause();
+    }
+  }, [choice.content_type, phase]);
+
   const colorClass = COLOR_CLASS[choice.choice_key];
   const label = CHOICE_LABEL[choice.choice_key];
 
@@ -38,7 +47,7 @@ function ChoiceCard({ choice, variant, count, dim }: Props) {
         )}
         {choice.content_type === "VIDEO" && choice.media_url && (
           <div className={`monitor-choice-media-wrap${dim ? " dim" : ""}`}>
-            <video src={mediaUrl(choice.media_url)} muted autoPlay loop />
+            <video ref={videoRef} src={mediaUrl(choice.media_url)} muted autoPlay loop />
           </div>
         )}
       </span>
