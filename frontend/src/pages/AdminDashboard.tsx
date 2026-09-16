@@ -8,6 +8,9 @@ export default function AdminDashboard() {
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState("");
+  const [savingEventId, setSavingEventId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   async function load() {
@@ -37,6 +40,39 @@ export default function AdminDashboard() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  function startEditing(event: EventAdminDetail) {
+    setError(null);
+    setEditingEventId(event.id);
+    setEditingName(event.name);
+  }
+
+  function cancelEditing() {
+    setEditingEventId(null);
+    setEditingName("");
+  }
+
+  async function handleRename(e: FormEvent, eventId: string) {
+    e.preventDefault();
+    const trimmedName = editingName.trim();
+    if (!trimmedName) {
+      setError("大会名を入力してください");
+      return;
+    }
+    setSavingEventId(eventId);
+    setError(null);
+    try {
+      const updated = await adminApi.patch<EventAdminDetail>(`/api/admin/events/${eventId}`, {
+        name: trimmedName,
+      });
+      setEvents((current) => current.map((event) => (event.id === eventId ? updated : event)));
+      cancelEditing();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSavingEventId(null);
     }
   }
 
@@ -86,7 +122,29 @@ export default function AdminDashboard() {
           <tbody>
             {events.map((e) => (
               <tr key={e.id}>
-                <td>{e.name}</td>
+                <td>
+                  {editingEventId === e.id ? (
+                    <form onSubmit={(event) => handleRename(event, e.id)} className="row">
+                      <input
+                        aria-label="大会名"
+                        value={editingName}
+                        onChange={(event) => setEditingName(event.target.value)}
+                        maxLength={200}
+                        style={{ padding: 8, borderRadius: 6, border: "1px solid #d1d5db", minWidth: 180 }}
+                      />
+                      <button className="btn" type="submit" disabled={savingEventId === e.id}>
+                        保存
+                      </button>
+                      <button className="btn secondary" type="button" onClick={cancelEditing} disabled={savingEventId === e.id}>
+                        キャンセル
+                      </button>
+                    </form>
+                  ) : (
+                    <>
+                      {e.name} <button className="btn secondary" onClick={() => startEditing(e)}>大会名を変更</button>
+                    </>
+                  )}
+                </td>
                 <td>
                   <span className="badge">{e.status}</span>
                 </td>

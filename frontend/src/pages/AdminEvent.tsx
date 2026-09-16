@@ -182,6 +182,12 @@ export default function AdminEvent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
 
+  useEffect(() => {
+    if (state?.event_name) {
+      setEvent((current) => (current && current.name !== state.event_name ? { ...current, name: state.event_name! } : current));
+    }
+  }, [state?.event_name]);
+
   async function handleDelete(q: QuestionAdminOut) {
     if (!eventId) return;
     const label = q.is_practice ? "練習問題" : `第${q.question_number}問`;

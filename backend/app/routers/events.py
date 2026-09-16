@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, selectinload
 from ..database import get_db
 from ..models import Choice, Event, EventQuestionState, EventStatus, Participant, Question, QuizPhase
 from ..quiz_state import build_admin_state, build_monitor_state, build_participant_state
-from ..schemas import EventAdminDetail, EventCreateRequest, EventPublic
+from ..schemas import EventAdminDetail, EventCreateRequest, EventNameUpdateRequest, EventPublic
 from ..security import require_admin
 from ..storage import get_media_storage
 from ..ws_manager import manager
@@ -47,6 +47,35 @@ def create_event(body: EventCreateRequest, db: Session = Depends(get_db), _admin
     db.commit()
     db.refresh(event)
     return event
+
+
+@router.patch("/api/admin/events/{event_id}", response_model=EventAdminDetail)
+def update_event_name(
+    event_id: UUID,
+    body: EventNameUpdateRequest,
+    db: Session = Depends(get_db),
+    _admin=Depends(require_admin),
+):
+    event = _get_event_or_404(db, event_id)
+    event.name = body.name
+    db.commit()
+    db.refresh(event)
+    _broadcast_current_state(db, event)
+
+    current_number = None
+    if event.current_question_id:
+        question = db.get(Question, event.current_question_id)
+        current_number = question.question_number if question else None
+    return EventAdminDetail(
+        id=event.id,
+        name=event.name,
+        status=event.status,
+        phase=event.phase,
+        created_at=event.created_at,
+        participant_count=db.query(Participant).filter(Participant.event_id == event.id).count(),
+        question_count=db.query(Question).filter(Question.event_id == event.id).count(),
+        current_question_number=current_number,
+    )
 
 
 @router.get("/api/admin/events", response_model=list[EventAdminDetail])

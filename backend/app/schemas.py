@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .models import ChoiceContentType, ChoiceKey, EventStatus, MediaType, QuizPhase
 
@@ -19,6 +19,26 @@ class TokenResponse(BaseModel):
 # ---------- Events ----------
 class EventCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=200)
+
+    @field_validator("name")
+    @classmethod
+    def normalize_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("大会名は空にできません")
+        return value
+
+
+class EventNameUpdateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+
+    @field_validator("name")
+    @classmethod
+    def normalize_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("大会名は空にできません")
+        return value
 
 
 class EventPublic(BaseModel):
