@@ -11,7 +11,7 @@ from ..storage import get_media_storage
 
 router = APIRouter(prefix="/api/admin/events/{event_id}/questions", tags=["questions"])
 
-MAX_QUESTIONS_PER_EVENT = 10
+MAX_QUESTIONS_PER_EVENT = 100
 CHOICE_KEY_SETS = {
     2: {ChoiceKey.A, ChoiceKey.B},
     3: {ChoiceKey.A, ChoiceKey.B, ChoiceKey.C},

@@ -377,8 +377,8 @@ export default function AdminEvent() {
         <div>
           <div className="card">
             <div className="row" style={{ justifyContent: "space-between" }}>
-              <h2>問題一覧({questions.length}/10)</h2>
-              {questions.length < 10 && editing === null && (
+              <h2>問題一覧({questions.length})</h2>
+              {editing === null && (
                 <button className="btn" onClick={() => setEditing("new")}>
                   問題を追加
                 </button>
