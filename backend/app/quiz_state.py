@@ -38,7 +38,7 @@ def _iso(dt: datetime | None) -> str | None:
     return dt.isoformat() if dt else None
 
 
-def compute_ranking(db: Session, event_id: UUID, limit: int = 5) -> list[dict]:
+def compute_ranking(db: Session, event_id: UUID, limit: int | None = 5) -> list[dict]:
     """正答数の多い順、次に正解問題の合計回答時間が短い順にランキングを算出する。
 
     練習問題(is_practice=True)への回答は集計対象外とする。
@@ -86,9 +86,19 @@ def compute_ranking(db: Session, event_id: UUID, limit: int = 5) -> list[dict]:
     result.sort(key=lambda r: (-r["correct_count"], r["total_response_time_ms"], str(r["participant_id"])))
 
     ranked = []
-    for i, r in enumerate(result[:limit]):
+    for i, r in enumerate(result):
         ranked.append({**r, "rank": i + 1})
-    return ranked
+    return ranked if limit is None else ranked[:limit]
+
+
+def compute_participant_final_rank(
+    db: Session, event_id: UUID, participant_id: UUID, full_ranking: list[dict] | None = None
+) -> int | None:
+    ranking = full_ranking if full_ranking is not None else compute_ranking(db, event_id, limit=None)
+    for entry in ranking:
+        if entry["participant_id"] == participant_id:
+            return entry["rank"]
+    return None
 
 
 def compute_fastest_correct_answer(db: Session, question_id: UUID) -> dict | None:
@@ -252,7 +262,12 @@ def build_monitor_state(db: Session, event: Event, include_question_details: boo
     return state
 
 
-def build_participant_state(db: Session, event: Event, participant_id: UUID | None = None) -> dict:
+def build_participant_state(
+    db: Session,
+    event: Event,
+    participant_id: UUID | None = None,
+    full_ranking: list[dict] | None = None,
+) -> dict:
     question = None
     if event.current_question_id:
         question = db.get(Question, event.current_question_id)
@@ -284,6 +299,11 @@ def build_participant_state(db: Session, event: Event, participant_id: UUID | No
                 }
             )
 
+    reveal_complete = event.phase == QuizPhase.RANKING and event.ranking_reveal_rank == 0
+    final_rank = None
+    if reveal_complete and participant_id is not None:
+        final_rank = compute_participant_final_rank(db, event.id, participant_id, full_ranking)
+
     state = {
         "type": "state_sync",
         "role": "participant",
@@ -298,6 +318,7 @@ def build_participant_state(db: Session, event: Event, participant_id: UUID | No
         "my_choice": answer.choice.value if answer is not None else None,
         "my_result": my_result,
         "correct_count": compute_participant_correct_count(db, event, participant_id),
+        "final_rank": final_rank,
         "transition_question_number": None,
         "transition_is_practice": None,
     }

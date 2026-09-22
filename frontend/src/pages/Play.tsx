@@ -97,6 +97,9 @@ export default function Play() {
   const canAnswer = phase === "ANSWER_OPEN" && !locked;
   const seconds = remainingMs !== null ? Math.ceil(remainingMs / 1000) : null;
   const feedback = (() => {
+    if (phase === "RANKING" && state?.final_rank != null) {
+      return { text: `最終順位 ${state.final_rank}位`, className: "feedback-final-rank" };
+    }
     if (phase === "CORRECT_ANSWER_SHOWN" || phase === "RANKING") {
       if (!state?.my_result?.answered) {
         return { text: "未回答", className: "feedback-unanswered" };

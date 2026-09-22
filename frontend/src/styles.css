@@ -473,6 +473,11 @@ th, td {
   color: #92400e;
 }
 
+.feedback-final-rank {
+  font-size: 32px;
+  color: var(--color-primary);
+}
+
 .conn-indicator {
   padding: 3px 10px;
   border-radius: 999px;

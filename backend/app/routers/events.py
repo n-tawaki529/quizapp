@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from ..database import get_db
 from ..models import Choice, Event, EventQuestionState, EventStatus, Participant, Question, QuizPhase
-from ..quiz_state import build_admin_state, build_monitor_state, build_participant_state
+from ..quiz_state import build_admin_state, build_monitor_state, build_participant_state, compute_ranking
 from ..schemas import EventAdminDetail, EventCreateRequest, EventNameUpdateRequest, EventPublic
 from ..security import require_admin
 from ..storage import get_media_storage
@@ -32,9 +32,12 @@ def _broadcast_current_state(db: Session, event: Event) -> None:
     # participantロールへは、接続中の参加者ごとに自分自身の正解数(correct_count)を
     # 個別に計算してパーソナライズした状態を配信する(他人の正解数は一切送らない)。
     default_participant_state = build_participant_state(db, event)
+    full_ranking = None
+    if event.phase == QuizPhase.RANKING and event.ranking_reveal_rank == 0:
+        full_ranking = compute_ranking(db, event.id, limit=None)
     connected_ids = manager.connected_participant_ids(str(event.id))
     per_participant_state = {
-        pid: build_participant_state(db, event, UUID(pid)) for pid in connected_ids
+        pid: build_participant_state(db, event, UUID(pid), full_ranking) for pid in connected_ids
     }
     manager.broadcast_participant_personalized_sync(str(event.id), default_participant_state, per_participant_state)
 

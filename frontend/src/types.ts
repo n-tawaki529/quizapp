@@ -142,6 +142,7 @@ export interface ParticipantState {
     is_correct?: boolean;
   } | null;
   correct_count: number;
+  final_rank: number | null;
 }
 
 export interface ParticipantSession {
