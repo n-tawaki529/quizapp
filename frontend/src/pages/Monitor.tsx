@@ -5,6 +5,8 @@ import { useEventSocket } from "../useEventSocket";
 import { useCountdown } from "../useCountdown";
 import { useCanvasScale } from "../useCanvasScale";
 import { useMediaPreloader } from "../useMediaPreloader";
+import { useMonitorAudio } from "../useMonitorAudio";
+import { BGM_TIME_LIMIT_SECONDS } from "../monitorAudioConfig";
 import { MonitorState, RankingEntry } from "../types";
 import ChoiceCard from "../components/monitor/ChoiceCard";
 import QuestionInfoPanel from "../components/monitor/QuestionInfoPanel";
@@ -29,6 +31,7 @@ export default function Monitor() {
   const [searchParams] = useSearchParams();
   const { state, connected } = useEventSocket<MonitorState>(eventId, "monitor");
   useMediaPreloader(state);
+  const { audioEnabled, enableAudio } = useMonitorAudio(state, eventId);
   const remainingMs = useCountdown(state?.answer_deadline, state?.server_time);
   const seconds = remainingMs !== null ? Math.ceil(remainingMs / 1000) : null;
   const scale = useCanvasScale();
@@ -50,6 +53,11 @@ export default function Monitor() {
   const renderCanvas = (content: ReactNode) => (
     <div className="monitor-viewport">
       <div className="monitor-canvas" style={{ transform: `scale(${scale})` }}>
+        {!audioEnabled && (
+          <button className="monitor-audio-unlock-button" type="button" onClick={enableAudio}>
+            音声を有効にする
+          </button>
+        )}
         {content}
       </div>
     </div>
@@ -192,6 +200,7 @@ export default function Monitor() {
               className="monitor-media"
               src={mediaUrl(q.question_media_url)}
               autoPlay={state.phase === "ANSWER_OPEN"}
+              muted={state.phase === "ANSWER_OPEN" && q.time_limit_seconds === BGM_TIME_LIMIT_SECONDS && audioEnabled}
               playsInline
               preload="auto"
             >
@@ -211,6 +220,7 @@ export default function Monitor() {
                       className="monitor-image-text-media"
                       src={mediaUrl(q.question_media_url)}
                       autoPlay={state.phase === "ANSWER_OPEN"}
+                      muted={state.phase === "ANSWER_OPEN" && q.time_limit_seconds === BGM_TIME_LIMIT_SECONDS && audioEnabled}
                       playsInline
                       preload="auto"
                     >
