@@ -91,6 +91,25 @@ def compute_ranking(db: Session, event_id: UUID, limit: int = 5) -> list[dict]:
     return ranked
 
 
+def compute_fastest_correct_answer(db: Session, question_id: UUID) -> dict | None:
+    answer = (
+        db.query(Answer, Participant)
+        .join(Participant, Participant.id == Answer.participant_id)
+        .filter(Answer.question_id == question_id, Answer.is_correct.is_(True))
+        .order_by(Answer.response_time_ms.asc(), Answer.answered_at.asc(), Answer.participant_id.asc())
+        .first()
+    )
+    if answer is None:
+        return None
+
+    answer_row, participant = answer
+    return {
+        "participant_id": participant.id,
+        "name": participant.name,
+        "response_time_ms": answer_row.response_time_ms,
+    }
+
+
 def compute_answer_counts(db: Session, question_id: UUID) -> dict:
     """指定した問題について、選択肢ごとに「回答するボタンを押して確定した」参加者数を集計する。
 
@@ -320,8 +339,19 @@ def build_admin_state(db: Session, event: Event) -> dict:
             state["admin_correct_choice"] = correct_choice.value if correct_choice else None
             state["admin_correct_choice_set"] = correct_choice is not None
             state["admin_dynamic_correct_answer"] = question.dynamic_correct_answer
+            if event.phase not in (
+                QuizPhase.NOT_STARTED,
+                QuizPhase.QUESTION_TRANSITION,
+                QuizPhase.PRE_QUESTION_MEDIA,
+                QuizPhase.QUESTION_SHOWN,
+                QuizPhase.ANSWER_OPEN,
+            ) and correct_choice is not None:
+                state["fastest_correct_answer"] = compute_fastest_correct_answer(db, question.id)
+            else:
+                state["fastest_correct_answer"] = None
     else:
         state["admin_correct_choice"] = None
         state["admin_correct_choice_set"] = False
         state["admin_dynamic_correct_answer"] = False
+        state["fastest_correct_answer"] = None
     return state

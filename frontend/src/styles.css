@@ -133,6 +133,26 @@ a {
   font-size: 14px;
 }
 
+.admin-fastest-card {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  width: fit-content;
+  margin: -4px 0 16px;
+  padding: 10px 14px;
+  border: 1px solid #d1fae5;
+  border-radius: 8px;
+  background: #f0fdf4;
+  color: #374151;
+  font-size: 14px;
+}
+
+.admin-fastest-label {
+  color: #166534;
+  font-weight: 600;
+}
+
 .admin-main-action {
   margin: 18px 0 12px;
 }

@@ -107,6 +107,11 @@ export interface MonitorState {
   answered_count?: number;
   connected_participant_count?: number;
   top_ranking?: RankingEntry[];
+  fastest_correct_answer?: {
+    participant_id: string;
+    name: string;
+    response_time_ms: number;
+  } | null;
 }
 
 export interface ParticipantQuestionState {

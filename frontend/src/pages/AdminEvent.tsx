@@ -500,6 +500,13 @@ export default function AdminEvent() {
             <span>接続中: {state?.connected_participant_count ?? "-"}</span>
             <span>回答数: {state?.answered_count ?? "-"}</span>
           </div>
+          {state?.fastest_correct_answer && (
+            <div className="admin-fastest-card">
+              <span className="admin-fastest-label">最速正解者</span>
+              <strong>{state.fastest_correct_answer.name}</strong>
+              <span>{(state.fastest_correct_answer.response_time_ms / 1000).toFixed(3)}秒</span>
+            </div>
+          )}
           {currentQuestionDetails?.dynamic_correct_answer &&
             (phase === "ANSWER_CLOSED" || phase === "ANSWER_COUNT_SHOWN") && (
               <div className="card" style={{ marginTop: 16, background: "#fff7ed" }}>
