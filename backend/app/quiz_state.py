@@ -16,7 +16,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .models import Answer, Event, EventQuestionState, Participant, Question, QuizPhase
+from .models import Answer, ChoiceContentType, Event, EventQuestionState, MediaType, Participant, Question, QuizPhase
 from .config import get_settings
 
 
@@ -166,6 +166,47 @@ def compute_participant_correct_count(db: Session, event: Event, participant_id:
     return query.count()
 
 
+def _peek_next_question(db: Session, event: Event) -> Question | None:
+    current_number = 0
+    if event.current_question_id:
+        current_question = db.get(Question, event.current_question_id)
+        current_number = current_question.question_number if current_question else 0
+    elif db.query(Question).filter(Question.event_id == event.id, Question.is_practice.is_(True)).first() is not None:
+        current_number = -1
+
+    return (
+        db.query(Question)
+        .filter(Question.event_id == event.id, Question.question_number == current_number + 1)
+        .first()
+    )
+
+
+def build_next_media_preview(db: Session, event: Event) -> dict | None:
+    question = _peek_next_question(db, event)
+    if question is None:
+        return None
+
+    media_types = {"IMAGE", "VIDEO"}
+
+    def media_entry(media_type: MediaType | ChoiceContentType, media_url: str | None) -> dict | None:
+        if media_type.value not in media_types or not media_url:
+            return None
+        return {"media_type": media_type.value, "media_url": media_url}
+
+    question_media = media_entry(question.question_media_type, question.question_media_url)
+    pre_question_media = media_entry(question.pre_question_media_type, question.pre_question_media_url)
+    choice_media = []
+    for choice in question.choices:
+        entry = media_entry(choice.content_type, choice.media_url)
+        if entry is not None:
+            choice_media.append(entry)
+    return {
+        "question_media": question_media,
+        "pre_question_media": pre_question_media,
+        "choice_media": choice_media,
+    }
+
+
 def build_choice_out(choice, include_reveal_text: bool = False) -> dict:
     result = {
         "choice_key": choice.choice_key.value,
@@ -207,6 +248,7 @@ def build_monitor_state(db: Session, event: Event, include_question_details: boo
         "transition_question_number": None,
         "transition_is_practice": None,
         "pre_media": None,
+        "next_media_preview": build_next_media_preview(db, event),
     }
     if question:
         state["transition_question_number"] = question.question_number
@@ -229,15 +271,14 @@ def build_monitor_state(db: Session, event: Event, include_question_details: boo
                 ],
                 "is_practice": question.is_practice,
             }
-            if include_question_details:
-                question_state.update(
-                    {
-                        "pre_question_media_type": question.pre_question_media_type.value,
-                        "pre_question_media_url": question.pre_question_media_url,
-                        "pre_correct_media_type": question.pre_correct_media_type.value,
-                        "pre_correct_media_url": question.pre_correct_media_url,
-                    }
-                )
+            question_state.update(
+                {
+                    "pre_question_media_type": question.pre_question_media_type.value,
+                    "pre_question_media_url": question.pre_question_media_url,
+                    "pre_correct_media_type": question.pre_correct_media_type.value,
+                    "pre_correct_media_url": question.pre_correct_media_url,
+                }
+            )
             state["question"] = question_state
         if event.phase in (QuizPhase.ANSWER_COUNT_SHOWN, QuizPhase.PRE_CORRECT_MEDIA, QuizPhase.CORRECT_ANSWER_SHOWN):
             state["answer_counts"] = compute_answer_counts(db, question.id)

@@ -9,7 +9,14 @@ from sqlalchemy.orm import Session
 from ..database import SessionLocal, get_db
 from ..config import get_settings
 from ..models import Answer, Event, EventQuestionState, EventStatus, MediaType, Participant, Question, QuizPhase
-from ..quiz_state import build_admin_state, build_monitor_state, build_participant_state, compute_ranking, get_effective_correct_choice
+from ..quiz_state import (
+    _peek_next_question,
+    build_admin_state,
+    build_monitor_state,
+    build_participant_state,
+    compute_ranking,
+    get_effective_correct_choice,
+)
 from ..schemas import AnswerRequest, AnswerResult, RankingResponse, SetCorrectChoiceRequest
 from ..security import require_admin, require_participant
 from ..ws_manager import manager
@@ -71,22 +78,7 @@ async def _auto_close_after_deadline(event_id: UUID, question_id: UUID, deadline
 # ---------------- 管理者: クイズ進行操作 ----------------
 def _advance_to_next_question(db: Session, event: Event) -> Question:
     """次の問題を切替状態にする(回答受付はまだ開始しない)。次の問題がなければ422を送出する。"""
-    current_number = 0
-    if event.current_question_id:
-        current_q = db.get(Question, event.current_question_id)
-        current_number = current_q.question_number if current_q else 0
-    elif (
-        db.query(Question).filter(Question.event_id == event.id, Question.is_practice.is_(True)).first()
-        is not None
-    ):
-        # 大会開始直後、練習問題(問題番号0番に予約)が存在する場合はそちらを先に出題する。
-        current_number = -1
-
-    next_q = (
-        db.query(Question)
-        .filter(Question.event_id == event.id, Question.question_number == current_number + 1)
-        .first()
-    )
+    next_q = _peek_next_question(db, event)
     if next_q is None:
         raise HTTPException(status_code=422, detail="次の問題はありません")
 

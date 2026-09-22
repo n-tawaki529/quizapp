@@ -96,6 +96,20 @@ export interface MonitorState {
     media_url: string;
     timing: "before_question" | "before_correct_answer";
   } | null;
+  next_media_preview: {
+    question_media: {
+      media_type: MediaType;
+      media_url: string;
+    } | null;
+    pre_question_media: {
+      media_type: MediaType;
+      media_url: string;
+    } | null;
+    choice_media: {
+      media_type: MediaType;
+      media_url: string;
+    }[];
+  } | null;
   ranking: RankingEntry[] | null;
   ranking_reveal_rank: number | null;
   answer_counts: Partial<Record<ChoiceKey, number>> | null;

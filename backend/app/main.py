@@ -80,7 +80,10 @@ def media_file(filename: str, request: Request):
     file_size = path.stat().st_size
     content_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
     byte_range = _parse_range(request.headers.get("range"), file_size)
-    common_headers = {"Accept-Ranges": "bytes"}
+    common_headers = {
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "public, max-age=31536000, immutable",
+    }
 
     if byte_range == (-1, -1):
         return Response(status_code=416, headers={**common_headers, "Content-Range": f"bytes */{file_size}"})
