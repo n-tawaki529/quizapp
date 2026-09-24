@@ -48,6 +48,13 @@ services:
     depends_on:
       - backend
 
+  loadtest:
+    profiles:
+      - loadtest
+    build:
+      context: .
+      dockerfile: loadtest/Dockerfile
+
 volumes:
   quizapp_pgdata:
   quizapp_media:
