@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, selectinload
 
-from ..database import get_db
+from ..database import get_db, pool_status
 from ..models import Choice, Event, EventQuestionState, EventStatus, Participant, Question, QuizPhase
 from ..quiz_state import (
     build_admin_state,
@@ -34,45 +34,86 @@ def _get_event_or_404(db: Session, event_id: UUID) -> Event:
 
 
 def _broadcast_current_state(
-    db: Session, event: Event, answer_open_committed_at: float | None = None
+    db: Session, event: Event, phase_committed_at: float | None = None
 ) -> None:
+    broadcast_started_at = time.perf_counter()
+    event_id_value = str(event.id)
+    phase_value = event.phase.value
+
+    monitor_build_started_at = time.perf_counter()
     monitor_state = build_monitor_state(db, event)
+    monitor_build_ms = (time.perf_counter() - monitor_build_started_at) * 1000
+
+    admin_build_started_at = time.perf_counter()
     admin_state = build_admin_state(db, event)
+    admin_build_ms = (time.perf_counter() - admin_build_started_at) * 1000
+
+    cache_started_at = time.perf_counter()
     cache_admin_state(event.id, admin_state)
-    manager.broadcast_all_sync(str(event.id), {"monitor": monitor_state, "admin": admin_state})
+    cache_admin_state_ms = (time.perf_counter() - cache_started_at) * 1000
+
+    question_id_value = str(event.current_question_id)
+    role_measurement = {"event_id": event_id_value, "phase": phase_value, "question_id": question_id_value}
+    manager.broadcast_all_sync(str(event.id), {"monitor": monitor_state, "admin": admin_state}, role_measurement)
 
     # participantロールへは、接続中の参加者ごとに自分自身の正解数(correct_count)を
     # 個別に計算してパーソナライズした状態を配信する(他人の正解数は一切送らない)。
+    default_participant_started_at = time.perf_counter()
     default_participant_state = build_participant_state(db, event)
+    default_participant_ms = (time.perf_counter() - default_participant_started_at) * 1000
+
     full_ranking = None
     if event.phase == QuizPhase.RANKING and event.ranking_reveal_rank == 0:
         full_ranking = compute_ranking(db, event.id, limit=None)
-    state_generation_started_at = time.perf_counter() if event.phase == QuizPhase.ANSWER_OPEN else None
+
+    connected_ids_started_at = time.perf_counter()
     connected_ids = manager.connected_participant_ids(str(event.id))
+    connected_ids_ms = (time.perf_counter() - connected_ids_started_at) * 1000
+
     participant_uuids = [UUID(pid) for pid in connected_ids]
+
+    bulk_started_at = time.perf_counter()
     bulk_states = build_participant_states_bulk(db, event, participant_uuids, full_ranking)
+    bulk_participant_ms = (time.perf_counter() - bulk_started_at) * 1000
     per_participant_state = {str(pid): state for pid, state in bulk_states.items()}
-    measurement = None
-    if state_generation_started_at is not None:
-        state_generation_ms = (time.perf_counter() - state_generation_started_at) * 1000
-        measurement = {
-            "event_id": str(event.id),
-            "question_id": str(event.current_question_id),
-            "connected_participants": len(connected_ids),
-            "answer_open_committed_at": answer_open_committed_at,
-            "query_strategy": "bulk",
-        }
-        logger.info(
-            "ANSWER_OPEN participant state generation event_id=%s question_id=%s "
-            "connected_participants=%s elapsed_ms=%.3f query_strategy=%s",
-            measurement["event_id"],
-            measurement["question_id"],
-            measurement["connected_participants"],
-            state_generation_ms,
-            measurement["query_strategy"],
-        )
+
+    participant_measurement = {
+        "event_id": event_id_value,
+        "phase": phase_value,
+        "question_id": question_id_value,
+        "connected_participants": len(connected_ids),
+        "phase_committed_at": phase_committed_at,
+    }
+    schedule_started_at = time.perf_counter()
     manager.broadcast_participant_personalized_sync(
-        str(event.id), default_participant_state, per_participant_state, measurement
+        str(event.id), default_participant_state, per_participant_state, participant_measurement
+    )
+    participant_schedule_ms = (time.perf_counter() - schedule_started_at) * 1000
+
+    total_ms = (time.perf_counter() - broadcast_started_at) * 1000
+    pool = pool_status()
+    # scheduleは予約のみで実送信ではない(実送信elapsed_msはws_manager.pyのPERF *_broadcast_sendログ側で計測)。
+    logger.info(
+        "PERF broadcast_state event_id=%s phase=%s question_id=%s connected=%s "
+        "monitor_build_ms=%.3f admin_build_ms=%.3f cache_admin_state_ms=%.3f "
+        "default_participant_ms=%.3f connected_ids_ms=%.3f bulk_participant_ms=%.3f "
+        "participant_schedule_ms=%.3f total_ms=%.3f "
+        "pool_checkedout=%s pool_size=%s pool_overflow=%s",
+        event_id_value,
+        phase_value,
+        question_id_value,
+        len(connected_ids),
+        monitor_build_ms,
+        admin_build_ms,
+        cache_admin_state_ms,
+        default_participant_ms,
+        connected_ids_ms,
+        bulk_participant_ms,
+        participant_schedule_ms,
+        total_ms,
+        pool["checkedout"],
+        pool["size"],
+        pool["overflow"],
     )
 
 

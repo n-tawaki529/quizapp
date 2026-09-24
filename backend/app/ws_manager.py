@@ -40,11 +40,13 @@ class ConnectionManager:
     def set_loop(self, loop: asyncio.AbstractEventLoop) -> None:
         self._loop = loop
 
-    def broadcast_all_sync(self, event_id: str, messages_by_role: dict[str, dict]) -> None:
+    def broadcast_all_sync(
+        self, event_id: str, messages_by_role: dict[str, dict], measurement: dict | None = None
+    ) -> None:
         """同期(スレッドプールで実行される)エンドポイントから安全にブロードキャストを予約する。"""
         if self._loop is None:
             return
-        asyncio.run_coroutine_threadsafe(self.broadcast_all(event_id, messages_by_role), self._loop)
+        asyncio.run_coroutine_threadsafe(self.broadcast_all(event_id, messages_by_role, measurement), self._loop)
 
     def broadcast_participant_personalized_sync(
         self,
@@ -91,7 +93,10 @@ class ConnectionManager:
         except Exception:
             logger.debug("failed to send message to a websocket", exc_info=True)
 
-    async def broadcast_role(self, event_id: str, role: str, message: dict) -> None:
+    async def broadcast_role(
+        self, event_id: str, role: str, message: dict, measurement: dict | None = None
+    ) -> None:
+        started_at = time.perf_counter() if measurement is not None else None
         conns = list(self._rooms.get(event_id, {}).get(role, set()))
         payload = json.dumps(message, default=_json_default)
         dead = []
@@ -104,10 +109,24 @@ class ConnectionManager:
             async with self._lock:
                 for ws in dead:
                     self._rooms[event_id][role].discard(ws)
+        if measurement is not None and started_at is not None:
+            elapsed_ms = (time.perf_counter() - started_at) * 1000
+            logger.info(
+                "PERF role_broadcast_send event_id=%s phase=%s question_id=%s role=%s "
+                "connections=%s elapsed_ms=%.3f",
+                measurement.get("event_id"),
+                measurement.get("phase"),
+                measurement.get("question_id"),
+                role,
+                len(conns),
+                elapsed_ms,
+            )
 
-    async def broadcast_all(self, event_id: str, messages_by_role: dict[str, dict]) -> None:
+    async def broadcast_all(
+        self, event_id: str, messages_by_role: dict[str, dict], measurement: dict | None = None
+    ) -> None:
         for role, message in messages_by_role.items():
-            await self.broadcast_role(event_id, role, message)
+            await self.broadcast_role(event_id, role, message, measurement)
 
     async def broadcast_participant_personalized(
         self,
@@ -138,13 +157,14 @@ class ConnectionManager:
         if measurement is not None and started_at is not None:
             elapsed_ms = (time.perf_counter() - started_at) * 1000
             total_ms = None
-            committed_at = measurement.get("answer_open_committed_at")
+            committed_at = measurement.get("phase_committed_at")
             if isinstance(committed_at, (int, float)):
                 total_ms = (time.perf_counter() - committed_at) * 1000
             logger.info(
-                "ANSWER_OPEN personalized broadcast event_id=%s question_id=%s "
+                "PERF participant_broadcast_send event_id=%s phase=%s question_id=%s "
                 "connected_participants=%s elapsed_ms=%.3f total_from_commit_ms=%s",
                 measurement["event_id"],
+                measurement.get("phase"),
                 measurement["question_id"],
                 measurement["connected_participants"],
                 elapsed_ms,

@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import Boolean, ForeignKey, Integer, String, UniqueConstraint, DateTime, Text
+from sqlalchemy import Boolean, ForeignKey, Index, Integer, String, UniqueConstraint, DateTime, Text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -174,7 +174,10 @@ class Participant(Base):
 
 class Answer(Base):
     __tablename__ = "answers"
-    __table_args__ = (UniqueConstraint("participant_id", "question_id", name="uq_answer_participant_question"),)
+    __table_args__ = (
+        UniqueConstraint("participant_id", "question_id", name="uq_answer_participant_question"),
+        Index("ix_answers_question_id", "question_id"),
+    )
 
     id: Mapped[uuid.UUID] = uuid_pk()
     participant_id: Mapped[uuid.UUID] = mapped_column(

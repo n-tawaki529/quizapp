@@ -138,6 +138,7 @@ def on_startup():
     _ensure_choice_reveal_text_column()
     _ensure_ranking_reveal_column()
     _ensure_dynamic_correct_answer_columns()
+    _ensure_answer_question_id_index()
     manager.set_loop(asyncio.get_event_loop())
 
 
@@ -195,6 +196,15 @@ def _ensure_dynamic_correct_answer_columns() -> None:
         conn = conn.execution_options(isolation_level="AUTOCOMMIT")
         conn.execute(text("ALTER TABLE questions ADD COLUMN IF NOT EXISTS dynamic_correct_answer BOOLEAN NOT NULL DEFAULT FALSE"))
         conn.execute(text("ALTER TABLE questions ALTER COLUMN correct_choice DROP NOT NULL"))
+
+
+def _ensure_answer_question_id_index() -> None:
+    """answers.question_idで絞り込むクエリ(bulk participant state生成/answered_count/correct_count集計)が
+    (participant_id, question_id)の複合UNIQUE indexに頼らず効率的に絞り込めるよう、単独indexを追加する。
+    """
+    with engine.connect() as conn:
+        conn = conn.execution_options(isolation_level="AUTOCOMMIT")
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_answers_question_id ON answers (question_id)"))
 
 
 @app.get("/api/health")

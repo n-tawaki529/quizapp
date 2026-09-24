@@ -21,3 +21,16 @@ def get_db() -> Generator:
         yield db
     finally:
         db.close()
+
+
+def pool_status() -> dict[str, int | str]:
+    """SQLAlchemy QueuePoolの現在の使用状況を、新規connectionを取得せず安全に取得する。"""
+    pool = engine.pool
+    try:
+        return {
+            "checkedout": pool.checkedout(),
+            "size": pool.size(),
+            "overflow": pool.overflow(),
+        }
+    except AttributeError:
+        return {"checkedout": "-", "size": "-", "overflow": "-"}
