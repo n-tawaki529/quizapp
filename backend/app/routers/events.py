@@ -6,7 +6,14 @@ from sqlalchemy.orm import Session, selectinload
 
 from ..database import get_db
 from ..models import Choice, Event, EventQuestionState, EventStatus, Participant, Question, QuizPhase
-from ..quiz_state import build_admin_state, build_monitor_state, build_participant_state, compute_ranking
+from ..quiz_state import (
+    build_admin_state,
+    build_monitor_state,
+    build_participant_state,
+    cache_admin_state,
+    clear_cached_admin_state,
+    compute_ranking,
+)
 from ..schemas import EventAdminDetail, EventCreateRequest, EventNameUpdateRequest, EventPublic
 from ..security import require_admin
 from ..storage import get_media_storage
@@ -27,6 +34,7 @@ def _get_event_or_404(db: Session, event_id: UUID) -> Event:
 def _broadcast_current_state(db: Session, event: Event) -> None:
     monitor_state = build_monitor_state(db, event)
     admin_state = build_admin_state(db, event)
+    cache_admin_state(event.id, admin_state)
     manager.broadcast_all_sync(str(event.id), {"monitor": monitor_state, "admin": admin_state})
 
     # participantロールへは、接続中の参加者ごとに自分自身の正解数(correct_count)を
@@ -227,6 +235,7 @@ def reset_event(event_id: UUID, db: Session = Depends(get_db), _admin=Depends(re
     db.commit()
     db.refresh(event)
 
+    clear_cached_admin_state(event_id)
     _broadcast_current_state(db, event)
 
     question_count = db.query(Question).filter(Question.event_id == event_id).count()
@@ -276,6 +285,7 @@ def delete_event(event_id: UUID, db: Session = Depends(get_db), _admin=Depends(r
 
     db.delete(event)
     db.commit()
+    clear_cached_admin_state(event_id)
 
     storage = get_media_storage()
     for url in media_urls:

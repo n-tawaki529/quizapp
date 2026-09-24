@@ -10,6 +10,7 @@
 """
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -21,6 +22,20 @@ from .config import get_settings
 
 
 settings = get_settings()
+_admin_state_cache: dict[str, dict] = {}
+
+
+def cache_admin_state(event_id: UUID, state: dict) -> None:
+    _admin_state_cache[str(event_id)] = deepcopy(state)
+
+
+def get_cached_admin_state(event_id: UUID) -> dict | None:
+    state = _admin_state_cache.get(str(event_id))
+    return deepcopy(state) if state is not None else None
+
+
+def clear_cached_admin_state(event_id: UUID) -> None:
+    _admin_state_cache.pop(str(event_id), None)
 
 
 def get_effective_correct_choice(db: Session, event: Event, question: Question):

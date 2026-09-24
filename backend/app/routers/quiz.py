@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import update
 from sqlalchemy.orm import Session
@@ -14,7 +14,9 @@ from ..quiz_state import (
     build_admin_state,
     build_monitor_state,
     build_participant_state,
+    cache_admin_state,
     compute_ranking,
+    get_cached_admin_state,
     get_effective_correct_choice,
 )
 from ..schemas import AnswerRequest, AnswerResult, RankingResponse, SetCorrectChoiceRequest
@@ -35,6 +37,7 @@ def _get_event_or_404(db: Session, event_id: UUID) -> Event:
 def _broadcast_current_state(db: Session, event: Event) -> None:
     monitor_state = build_monitor_state(db, event)
     admin_state = build_admin_state(db, event)
+    cache_admin_state(event.id, admin_state)
     manager.broadcast_all_sync(str(event.id), {"monitor": monitor_state, "admin": admin_state})
 
     # participantロールへは、接続中の参加者ごとに自分自身の正解数(correct_count)を
@@ -338,6 +341,7 @@ def server_time():
 def submit_answer(
     event_id: UUID,
     body: AnswerRequest,
+    request: Request,
     db: Session = Depends(get_db),
     payload: dict = Depends(require_participant),
 ):
@@ -356,7 +360,7 @@ def submit_answer(
     if event.phase != QuizPhase.ANSWER_OPEN or event.current_question_id != body.question_id:
         return AnswerResult(accepted=False, message="現在この問題の回答は受け付けていません")
 
-    now = datetime.now(timezone.utc)
+    now = getattr(request.state, "quiz_received_at", None) or datetime.now(timezone.utc)
     # サーバー側でも必ず制限時間内かどうかを判定する
     if event.answer_deadline is None or now > event.answer_deadline:
         return AnswerResult(accepted=False, message="回答受付時間が終了しています")
@@ -395,7 +399,12 @@ def submit_answer(
         db.rollback()
         return AnswerResult(accepted=False, message="既に回答済みです")
 
-    admin_state = build_admin_state(db, event)
+    admin_state = get_cached_admin_state(event.id)
+    if admin_state is None:
+        admin_state = build_admin_state(db, event)
+        cache_admin_state(event.id, admin_state)
+    admin_state["answered_count"] = db.query(Answer).filter(Answer.question_id == event.current_question_id).count()
+    admin_state["connected_participant_count"] = manager.count(str(event.id), "participant")
     manager.broadcast_all_sync(
         str(event_id),
         {"admin": admin_state},

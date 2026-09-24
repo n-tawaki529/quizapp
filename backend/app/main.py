@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import mimetypes
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -17,7 +18,24 @@ logging.basicConfig(level=logging.INFO)
 
 settings = get_settings()
 
+
+class RequestReceivedAtMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        scope.setdefault("state", {})["quiz_received_at"] = datetime.now(timezone.utc)
+        await self.app(scope, receive, send)
+
+
 app = FastAPI(title="リアルタイム4択クイズ大会 API")
+app.add_middleware(
+    RequestReceivedAtMiddleware,
+)
 
 app.add_middleware(
     CORSMiddleware,
