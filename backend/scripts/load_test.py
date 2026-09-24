@@ -169,6 +169,7 @@ async def simulate_participant(
                     if qid == answered_question_id:
                         continue
                     answered_question_id = qid
+                    stats["answer_open_receives"].append(time.perf_counter())
                     choice_keys = msg["question"].get("choice_keys", [])
                     if not choice_keys:
                         stats["answers_failed"] += 1
@@ -284,6 +285,9 @@ def print_summary(stats: dict, elapsed: float, burst: bool) -> None:
     print(f"  joined: {stats['join_succeeded']}")
     print(f"  failed: {stats['join_failed']}")
     print(f"  success rate: {join_rate:.1%}")
+    print_millisecond_summary(
+        "ANSWER_OPEN WebSocket receive (relative to first)", stats["answer_open_receives"], True
+    )
     print("Join errors")
     print(f"  timeout: {stats['join_http_errors']['timeout']}")
     print(f"  4xx: {stats['join_http_errors']['4xx']}")
@@ -352,6 +356,7 @@ async def main() -> None:
         "answers_ok": 0,
         "answers_rejected": 0,
         "answers_failed": 0,
+        "answer_open_receives": [],
         "answer_send_starts": [],
         "answer_response_completions": [],
         "actual_http_worker_starts": [],

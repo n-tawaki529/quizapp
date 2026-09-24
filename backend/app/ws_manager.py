@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import time
 from collections import defaultdict
 from typing import Any
 from uuid import UUID
@@ -46,13 +47,19 @@ class ConnectionManager:
         asyncio.run_coroutine_threadsafe(self.broadcast_all(event_id, messages_by_role), self._loop)
 
     def broadcast_participant_personalized_sync(
-        self, event_id: str, default_message: dict, per_participant_message: dict[str, dict]
+        self,
+        event_id: str,
+        default_message: dict,
+        per_participant_message: dict[str, dict],
+        measurement: dict | None = None,
     ) -> None:
         """participantロールの各接続へ、participant_idごとに異なる内容を配信する(同期版)。"""
         if self._loop is None:
             return
         asyncio.run_coroutine_threadsafe(
-            self.broadcast_participant_personalized(event_id, default_message, per_participant_message),
+            self.broadcast_participant_personalized(
+                event_id, default_message, per_participant_message, measurement
+            ),
             self._loop,
         )
 
@@ -103,13 +110,18 @@ class ConnectionManager:
             await self.broadcast_role(event_id, role, message)
 
     async def broadcast_participant_personalized(
-        self, event_id: str, default_message: dict, per_participant_message: dict[str, dict]
+        self,
+        event_id: str,
+        default_message: dict,
+        per_participant_message: dict[str, dict],
+        measurement: dict | None = None,
     ) -> None:
         """participantロールの各接続へ、participant_idごとに異なる内容を配信する。
 
         participant_idが不明な接続や、対応するメッセージが用意されていない接続には
         default_message(個人情報を含まない汎用の状態)を送る。
         """
+        started_at = time.perf_counter() if measurement is not None else None
         conns = list(self._participant_ids.get(event_id, {}).items())
         dead = []
         for ws, pid in conns:
@@ -123,6 +135,21 @@ class ConnectionManager:
                 for ws in dead:
                     self._rooms[event_id]["participant"].discard(ws)
                     self._participant_ids[event_id].pop(ws, None)
+        if measurement is not None and started_at is not None:
+            elapsed_ms = (time.perf_counter() - started_at) * 1000
+            total_ms = None
+            committed_at = measurement.get("answer_open_committed_at")
+            if isinstance(committed_at, (int, float)):
+                total_ms = (time.perf_counter() - committed_at) * 1000
+            logger.info(
+                "ANSWER_OPEN personalized broadcast event_id=%s question_id=%s "
+                "connected_participants=%s elapsed_ms=%.3f total_from_commit_ms=%s",
+                measurement["event_id"],
+                measurement["question_id"],
+                measurement["connected_participants"],
+                elapsed_ms,
+                f"{total_ms:.3f}" if total_ms is not None else "-",
+            )
 
     def count(self, event_id: str, role: str) -> int:
         return len(self._rooms.get(event_id, {}).get(role, set()))

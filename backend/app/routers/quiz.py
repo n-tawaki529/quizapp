@@ -1,3 +1,5 @@
+import logging
+import time
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
@@ -25,6 +27,7 @@ from ..ws_manager import manager
 
 router = APIRouter(tags=["quiz"])
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 def _get_event_or_404(db: Session, event_id: UUID) -> Event:
@@ -34,7 +37,9 @@ def _get_event_or_404(db: Session, event_id: UUID) -> Event:
     return event
 
 
-def _broadcast_current_state(db: Session, event: Event) -> None:
+def _broadcast_current_state(
+    db: Session, event: Event, answer_open_committed_at: float | None = None
+) -> None:
     monitor_state = build_monitor_state(db, event)
     admin_state = build_admin_state(db, event)
     cache_admin_state(event.id, admin_state)
@@ -46,11 +51,31 @@ def _broadcast_current_state(db: Session, event: Event) -> None:
     full_ranking = None
     if event.phase == QuizPhase.RANKING and event.ranking_reveal_rank == 0:
         full_ranking = compute_ranking(db, event.id, limit=None)
+    state_generation_started_at = time.perf_counter() if event.phase == QuizPhase.ANSWER_OPEN else None
     connected_ids = manager.connected_participant_ids(str(event.id))
     per_participant_state = {
         pid: build_participant_state(db, event, UUID(pid), full_ranking) for pid in connected_ids
     }
-    manager.broadcast_participant_personalized_sync(str(event.id), default_participant_state, per_participant_state)
+    measurement = None
+    if state_generation_started_at is not None:
+        state_generation_ms = (time.perf_counter() - state_generation_started_at) * 1000
+        measurement = {
+            "event_id": str(event.id),
+            "question_id": str(event.current_question_id),
+            "connected_participants": len(connected_ids),
+            "answer_open_committed_at": answer_open_committed_at,
+        }
+        logger.info(
+            "ANSWER_OPEN participant state generation event_id=%s question_id=%s "
+            "connected_participants=%s elapsed_ms=%.3f",
+            measurement["event_id"],
+            measurement["question_id"],
+            measurement["connected_participants"],
+            state_generation_ms,
+        )
+    manager.broadcast_participant_personalized_sync(
+        str(event.id), default_participant_state, per_participant_state, measurement
+    )
 
 
 def _close_answer_if_still_open_sync(event_id: UUID, question_id: UUID) -> None:
@@ -133,7 +158,7 @@ def _commit_answer_start(db: Session, event: Event, question: Question) -> None:
     db.commit()
     db.refresh(event)
 
-    _broadcast_current_state(db, event)
+    _broadcast_current_state(db, event, time.perf_counter())
     manager.schedule_sync(_auto_close_after_deadline(event.id, question.id, event.answer_deadline))
 
 
