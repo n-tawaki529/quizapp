@@ -119,6 +119,11 @@ def exception_reason(error: BaseException) -> str:
     return f"{type(error).__name__}: {message}" if message else type(error).__name__
 
 
+def ws_failure_reason(error: BaseException) -> str:
+    message = str(error).strip()
+    return f"{type(error).__name__}({message})" if message else type(error).__name__
+
+
 async def simulate_participant(
     idx: int,
     base_url: str,
@@ -229,20 +234,22 @@ async def simulate_participant(
                         if worker_start is not None:
                             stats["actual_http_worker_starts"].append(worker_start)
                             stats["executor_waits"].append((worker_start - timing["executor_submit"]) * 1000)
-    except websockets.exceptions.ConnectionClosed:
+    except websockets.exceptions.ConnectionClosed as error:
         if normal_end:
             return
         if connected:
             stats["ws_disconnected"] += 1
         else:
             stats["ws_connect_failed"] += 1
-    except Exception:
+            stats["ws_connect_failure_reasons"][ws_failure_reason(error)] += 1
+    except Exception as error:
         if normal_end:
             return
         if connected:
             stats["ws_disconnected"] += 1
         else:
             stats["ws_connect_failed"] += 1
+            stats["ws_connect_failure_reasons"][ws_failure_reason(error)] += 1
 
 
 def print_latency_summary(label: str, values: list[float]) -> None:
@@ -303,6 +310,9 @@ def print_summary(stats: dict, elapsed: float, burst: bool) -> None:
     print(f"  connected: {stats['ws_connected']}")
     print(f"  connect failed: {stats['ws_connect_failed']}")
     print(f"  unexpected disconnected: {stats['ws_disconnected']}")
+    print("WebSocket connect failure reasons:")
+    for reason, count in stats["ws_connect_failure_reasons"].most_common():
+        print(f"  {reason}: {count}")
     print("Answers")
     print(f"  attempted: {stats['answers_attempted']}")
     print(f"  accepted: {stats['answers_ok']}")
@@ -351,6 +361,7 @@ async def main() -> None:
         "join_failure_reasons": Counter(),
         "ws_connected": 0,
         "ws_connect_failed": 0,
+        "ws_connect_failure_reasons": Counter(),
         "ws_disconnected": 0,
         "answers_attempted": 0,
         "answers_ok": 0,

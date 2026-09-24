@@ -419,6 +419,132 @@ def build_participant_state(
     return state
 
 
+def build_participant_states_bulk(
+    db: Session,
+    event: Event,
+    participant_ids: list[UUID],
+    full_ranking: list[dict] | None = None,
+) -> dict[UUID, dict]:
+    """接続中participant全員分のstateを、participantごとのDB queryを発行せずに生成する。
+
+    build_participant_state()と同じJSON構造・同じ判定条件を維持しつつ、
+    Participant存在確認・Answer確認・correct_count集計をそれぞれ1回のbulk queryにまとめる。
+    _broadcast_current_state()専用で、単体のbuild_participant_state()の挙動・呼び出し元には影響しない。
+    """
+    if not participant_ids:
+        return {}
+
+    question = None
+    if event.current_question_id:
+        question = db.get(Question, event.current_question_id)
+
+    now = datetime.now(timezone.utc)
+    remaining_ms = None
+    if event.phase.value == "ANSWER_OPEN" and event.answer_deadline:
+        remaining_ms = max(0, int((event.answer_deadline - now).total_seconds() * 1000))
+
+    # participant_valid判定: 実在するParticipant idの集合を1回のqueryで取得する(既存条件と同義)。
+    valid_participant_ids = {
+        row[0]
+        for row in db.query(Participant.id).filter(Participant.id.in_(participant_ids)).all()
+    }
+
+    # already_answered / my_choice判定: 現在問題への回答をparticipant分まとめて取得する。
+    answers_by_participant: dict[UUID, Answer] = {}
+    if question is not None:
+        answer_rows = (
+            db.query(Answer)
+            .filter(Answer.question_id == question.id, Answer.participant_id.in_(participant_ids))
+            .all()
+        )
+        answers_by_participant = {a.participant_id: a for a in answer_rows}
+
+    # correct_count判定: compute_participant_correct_count()と同一条件でGROUP BY集計する。
+    correct_count_query = (
+        db.query(Answer.participant_id, func.count(Answer.id))
+        .join(Question, Question.id == Answer.question_id)
+        .filter(
+            Answer.participant_id.in_(participant_ids),
+            Answer.is_correct.is_(True),
+            Question.is_practice.is_(False),
+        )
+    )
+    if event.current_question_id is not None and event.phase not in (
+        QuizPhase.CORRECT_ANSWER_SHOWN,
+        QuizPhase.RANKING,
+    ):
+        correct_count_query = correct_count_query.filter(Answer.question_id != event.current_question_id)
+    correct_counts: dict[UUID, int] = {
+        pid: int(cnt) for pid, cnt in correct_count_query.group_by(Answer.participant_id).all()
+    }
+
+    result_visible = event.phase in (QuizPhase.CORRECT_ANSWER_SHOWN, QuizPhase.RANKING)
+    reveal_complete = event.phase == QuizPhase.RANKING and event.ranking_reveal_rank == 0
+    # full_rankingが渡されている場合はDBを再度引かず、辞書引きだけでfinal_rankを求める。
+    final_rank_by_participant: dict[UUID, int] = {}
+    if reveal_complete and full_ranking is not None:
+        final_rank_by_participant = {r["participant_id"]: r["rank"] for r in full_ranking}
+
+    question_common: dict | None = None
+    if question and event.phase not in (
+        QuizPhase.QUESTION_TRANSITION,
+        QuizPhase.PRE_QUESTION_MEDIA,
+        QuizPhase.PRE_CORRECT_MEDIA,
+    ):
+        question_common = {
+            "id": str(question.id),
+            "question_number": question.question_number,
+            "question_text": question.question_text,
+            "choice_keys": [c.choice_key.value for c in question.choices],
+            "is_practice": question.is_practice,
+        }
+
+    states: dict[UUID, dict] = {}
+    for participant_id in participant_ids:
+        answer = answers_by_participant.get(participant_id)
+        already_answered = answer is not None
+        my_result = None
+        if result_visible:
+            my_result = {"answered": answer is not None}
+            if answer is not None:
+                my_result.update({"choice_key": answer.choice.value, "is_correct": answer.is_correct})
+
+        final_rank = None
+        if reveal_complete:
+            final_rank = (
+                final_rank_by_participant.get(participant_id)
+                if full_ranking is not None
+                else compute_participant_final_rank(db, event.id, participant_id, None)
+            )
+
+        state = {
+            "type": "state_sync",
+            "role": "participant",
+            "event_id": str(event.id),
+            "phase": event.phase.value,
+            "answer_deadline": _iso(event.answer_deadline),
+            "remaining_ms": remaining_ms,
+            "server_time": _iso(now),
+            "question": None,
+            "participant_valid": participant_id in valid_participant_ids,
+            "already_answered": already_answered,
+            "my_choice": answer.choice.value if answer is not None else None,
+            "my_result": my_result,
+            "correct_count": correct_counts.get(participant_id, 0),
+            "final_rank": final_rank,
+            "transition_question_number": None,
+            "transition_is_practice": None,
+        }
+        if question:
+            state["transition_question_number"] = question.question_number
+            state["transition_is_practice"] = question.is_practice
+            if question_common is not None:
+                # participant間で内容が同じ読み取り専用データのため、コピーせず共有する。
+                state["question"] = question_common
+        states[participant_id] = state
+    return states
+
+
 def build_admin_state(db: Session, event: Event) -> dict:
     from .ws_manager import manager
 

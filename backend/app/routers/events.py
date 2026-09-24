@@ -11,6 +11,7 @@ from ..quiz_state import (
     build_admin_state,
     build_monitor_state,
     build_participant_state,
+    build_participant_states_bulk,
     cache_admin_state,
     clear_cached_admin_state,
     compute_ranking,
@@ -48,9 +49,9 @@ def _broadcast_current_state(
         full_ranking = compute_ranking(db, event.id, limit=None)
     state_generation_started_at = time.perf_counter() if event.phase == QuizPhase.ANSWER_OPEN else None
     connected_ids = manager.connected_participant_ids(str(event.id))
-    per_participant_state = {
-        pid: build_participant_state(db, event, UUID(pid), full_ranking) for pid in connected_ids
-    }
+    participant_uuids = [UUID(pid) for pid in connected_ids]
+    bulk_states = build_participant_states_bulk(db, event, participant_uuids, full_ranking)
+    per_participant_state = {str(pid): state for pid, state in bulk_states.items()}
     measurement = None
     if state_generation_started_at is not None:
         state_generation_ms = (time.perf_counter() - state_generation_started_at) * 1000
@@ -59,14 +60,16 @@ def _broadcast_current_state(
             "question_id": str(event.current_question_id),
             "connected_participants": len(connected_ids),
             "answer_open_committed_at": answer_open_committed_at,
+            "query_strategy": "bulk",
         }
         logger.info(
             "ANSWER_OPEN participant state generation event_id=%s question_id=%s "
-            "connected_participants=%s elapsed_ms=%.3f",
+            "connected_participants=%s elapsed_ms=%.3f query_strategy=%s",
             measurement["event_id"],
             measurement["question_id"],
             measurement["connected_participants"],
             state_generation_ms,
+            measurement["query_strategy"],
         )
     manager.broadcast_participant_personalized_sync(
         str(event.id), default_participant_state, per_participant_state, measurement
