@@ -1,3 +1,4 @@
+import asyncio
 from uuid import UUID
 
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
@@ -56,7 +57,8 @@ async def websocket_endpoint(
 
     await manager.connect(str(event_id), role, websocket, str(participant_id) if participant_id else None)
     try:
-        initial_state = _build_initial_state(event_id, role, participant_id)
+        # 同期DB処理をworker threadへ委譲し、asyncio event loopをブロックしないようにする。
+        initial_state = await asyncio.to_thread(_build_initial_state, event_id, role, participant_id)
         if initial_state is None:
             await websocket.close(code=4404)
             return

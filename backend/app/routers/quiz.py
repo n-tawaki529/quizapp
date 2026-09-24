@@ -18,8 +18,8 @@ from ..quiz_state import (
     build_participant_state,
     cache_admin_state,
     compute_ranking,
-    get_cached_admin_state,
     get_effective_correct_choice,
+    increment_cached_answered_count,
 )
 from ..schemas import AnswerRequest, AnswerResult, RankingResponse, SetCorrectChoiceRequest
 from ..security import require_admin, require_participant
@@ -424,12 +424,15 @@ def submit_answer(
         db.rollback()
         return AnswerResult(accepted=False, message="既に回答済みです")
 
-    admin_state = get_cached_admin_state(event.id)
+    # commit後はexpire_on_commit=TrueによりEvent ORMオブジェクトの属性が失効しているため、
+    # event.id/event.current_question_id等への再アクセス(暗黙SELECT・connection再取得の原因)は行わず、
+    # リクエストパラメータ由来のプリミティブ値(event_id/body.question_id)のみを使用する。
+    admin_state = increment_cached_answered_count(event_id, body.question_id)
     if admin_state is None:
+        # キャッシュ不在/対象問題不一致の場合のみ、DBから正しい状態を再構築する(稀な経路)。
         admin_state = build_admin_state(db, event)
-        cache_admin_state(event.id, admin_state)
-    admin_state["answered_count"] = db.query(Answer).filter(Answer.question_id == event.current_question_id).count()
-    admin_state["connected_participant_count"] = manager.count(str(event.id), "participant")
+        cache_admin_state(event_id, admin_state)
+    admin_state["connected_participant_count"] = manager.count(str(event_id), "participant")
     manager.broadcast_all_sync(
         str(event_id),
         {"admin": admin_state},

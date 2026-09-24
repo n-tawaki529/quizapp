@@ -10,6 +10,7 @@
 """
 from __future__ import annotations
 
+import threading
 from copy import deepcopy
 from datetime import datetime, timezone
 from uuid import UUID
@@ -23,19 +24,41 @@ from .config import get_settings
 
 settings = get_settings()
 _admin_state_cache: dict[str, dict] = {}
+# 複数スレッド(AnyIOワーカー)から同時に読み書きされるため、キャッシュ本体を1つのロックで保護する。
+_admin_state_cache_lock = threading.Lock()
 
 
 def cache_admin_state(event_id: UUID, state: dict) -> None:
-    _admin_state_cache[str(event_id)] = deepcopy(state)
+    with _admin_state_cache_lock:
+        _admin_state_cache[str(event_id)] = deepcopy(state)
 
 
 def get_cached_admin_state(event_id: UUID) -> dict | None:
-    state = _admin_state_cache.get(str(event_id))
-    return deepcopy(state) if state is not None else None
+    with _admin_state_cache_lock:
+        state = _admin_state_cache.get(str(event_id))
+        return deepcopy(state) if state is not None else None
 
 
 def clear_cached_admin_state(event_id: UUID) -> None:
-    _admin_state_cache.pop(str(event_id), None)
+    with _admin_state_cache_lock:
+        _admin_state_cache.pop(str(event_id), None)
+
+
+def increment_cached_answered_count(event_id: UUID, question_id: UUID) -> dict | None:
+    """キャッシュ済みadmin_stateのanswered_countを読み取り→+1→書き戻しまでロック内で行い、
+    並行回答によるlost updateを防ぐ。キャッシュ不在/対象問題不一致の場合はNoneを返し、
+    呼び出し側にDBからの再構築を委ねる。
+    """
+    key = str(event_id)
+    with _admin_state_cache_lock:
+        state = _admin_state_cache.get(key)
+        if state is None:
+            return None
+        question = state.get("question")
+        if not question or question.get("id") != str(question_id):
+            return None
+        state["answered_count"] = int(state.get("answered_count") or 0) + 1
+        return deepcopy(state)
 
 
 def get_effective_correct_choice(db: Session, event: Event, question: Question):
