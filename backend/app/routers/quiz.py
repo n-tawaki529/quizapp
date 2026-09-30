@@ -375,11 +375,7 @@ def show_ranking(event_id: UUID, db: Session = Depends(get_db), _admin=Depends(r
     event = _get_event_or_404(db, event_id)
     event.phase = QuizPhase.RANKING
     ranking = compute_ranking(db, event.id, limit=settings.ranking_display_limit)
-    event.ranking_reveal_rank = (
-        settings.ranking_group_reveal_threshold
-        if len(ranking) >= settings.ranking_group_reveal_threshold
-        else None
-    )
+    event.ranking_reveal_rank = None
     db.commit()
     db.refresh(event)
     _broadcast_current_state(db, event, precomputed_ranking=ranking)

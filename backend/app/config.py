@@ -28,7 +28,6 @@ class Settings(BaseSettings):
 
     default_time_limit_seconds: int = 10
     ranking_display_limit: int = 10
-    ranking_group_reveal_threshold: int = 4
 
     @property
     def cors_origin_list(self) -> list[str]:
