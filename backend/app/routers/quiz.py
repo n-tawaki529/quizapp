@@ -39,18 +39,24 @@ def _get_event_or_404(db: Session, event_id: UUID) -> Event:
 
 
 def _broadcast_current_state(
-    db: Session, event: Event, phase_committed_at: float | None = None
+    db: Session,
+    event: Event,
+    phase_committed_at: float | None = None,
+    precomputed_ranking: list[dict] | None = None,
 ) -> None:
     broadcast_started_at = time.perf_counter()
     event_id_value = str(event.id)
     phase_value = event.phase.value
 
     monitor_build_started_at = time.perf_counter()
-    monitor_state = build_monitor_state(db, event)
+    if event.phase == QuizPhase.RANKING and precomputed_ranking is None:
+        precomputed_ranking = compute_ranking(db, event.id, limit=settings.ranking_display_limit)
+
+    monitor_state = build_monitor_state(db, event, precomputed_ranking=precomputed_ranking)
     monitor_build_ms = (time.perf_counter() - monitor_build_started_at) * 1000
 
     admin_build_started_at = time.perf_counter()
-    admin_state = build_admin_state(db, event)
+    admin_state = build_admin_state(db, event, precomputed_ranking=precomputed_ranking)
     admin_build_ms = (time.perf_counter() - admin_build_started_at) * 1000
 
     cache_started_at = time.perf_counter()
@@ -61,39 +67,49 @@ def _broadcast_current_state(
     role_measurement = {"event_id": event_id_value, "phase": phase_value, "question_id": question_id_value}
     manager.broadcast_all_sync(str(event.id), {"monitor": monitor_state, "admin": admin_state}, role_measurement)
 
+    should_broadcast_participants = not (
+        event.phase == QuizPhase.RANKING and event.ranking_reveal_rank != 0
+    )
+
     # participantロールへは、接続中の参加者ごとに自分自身の正解数(correct_count)を
     # 個別に計算してパーソナライズした状態を配信する(他人の正解数は一切送らない)。
-    default_participant_started_at = time.perf_counter()
-    default_participant_state = build_participant_state(db, event)
-    default_participant_ms = (time.perf_counter() - default_participant_started_at) * 1000
+    default_participant_ms = 0.0
+    connected_ids = set()
+    connected_ids_ms = 0.0
+    bulk_participant_ms = 0.0
+    participant_schedule_ms = 0.0
+    if should_broadcast_participants:
+        default_participant_started_at = time.perf_counter()
+        default_participant_state = build_participant_state(db, event)
+        default_participant_ms = (time.perf_counter() - default_participant_started_at) * 1000
 
-    full_ranking = None
-    if event.phase == QuizPhase.RANKING and event.ranking_reveal_rank == 0:
-        full_ranking = compute_ranking(db, event.id, limit=None)
+        full_ranking = None
+        if event.phase == QuizPhase.RANKING and event.ranking_reveal_rank == 0:
+            full_ranking = compute_ranking(db, event.id, limit=None)
 
-    connected_ids_started_at = time.perf_counter()
-    connected_ids = manager.connected_participant_ids(str(event.id))
-    connected_ids_ms = (time.perf_counter() - connected_ids_started_at) * 1000
+        connected_ids_started_at = time.perf_counter()
+        connected_ids = manager.connected_participant_ids(str(event.id))
+        connected_ids_ms = (time.perf_counter() - connected_ids_started_at) * 1000
 
-    participant_uuids = [UUID(pid) for pid in connected_ids]
+        participant_uuids = [UUID(pid) for pid in connected_ids]
 
-    bulk_started_at = time.perf_counter()
-    bulk_states = build_participant_states_bulk(db, event, participant_uuids, full_ranking)
-    bulk_participant_ms = (time.perf_counter() - bulk_started_at) * 1000
-    per_participant_state = {str(pid): state for pid, state in bulk_states.items()}
+        bulk_started_at = time.perf_counter()
+        bulk_states = build_participant_states_bulk(db, event, participant_uuids, full_ranking)
+        bulk_participant_ms = (time.perf_counter() - bulk_started_at) * 1000
+        per_participant_state = {str(pid): state for pid, state in bulk_states.items()}
 
-    participant_measurement = {
-        "event_id": event_id_value,
-        "phase": phase_value,
-        "question_id": question_id_value,
-        "connected_participants": len(connected_ids),
-        "phase_committed_at": phase_committed_at,
-    }
-    schedule_started_at = time.perf_counter()
-    manager.broadcast_participant_personalized_sync(
-        str(event.id), default_participant_state, per_participant_state, participant_measurement
-    )
-    participant_schedule_ms = (time.perf_counter() - schedule_started_at) * 1000
+        participant_measurement = {
+            "event_id": event_id_value,
+            "phase": phase_value,
+            "question_id": question_id_value,
+            "connected_participants": len(connected_ids),
+            "phase_committed_at": phase_committed_at,
+        }
+        schedule_started_at = time.perf_counter()
+        manager.broadcast_participant_personalized_sync(
+            str(event.id), default_participant_state, per_participant_state, participant_measurement
+        )
+        participant_schedule_ms = (time.perf_counter() - schedule_started_at) * 1000
 
     total_ms = (time.perf_counter() - broadcast_started_at) * 1000
     pool = pool_status()
@@ -358,10 +374,15 @@ def set_correct_choice(
 def show_ranking(event_id: UUID, db: Session = Depends(get_db), _admin=Depends(require_admin)):
     event = _get_event_or_404(db, event_id)
     event.phase = QuizPhase.RANKING
-    event.ranking_reveal_rank = None
+    ranking = compute_ranking(db, event.id, limit=settings.ranking_display_limit)
+    event.ranking_reveal_rank = (
+        settings.ranking_group_reveal_threshold
+        if len(ranking) >= settings.ranking_group_reveal_threshold
+        else None
+    )
     db.commit()
     db.refresh(event)
-    _broadcast_current_state(db, event)
+    _broadcast_current_state(db, event, precomputed_ranking=ranking)
     return {"ok": True}
 
 
@@ -382,7 +403,7 @@ def ranking_reveal_next(event_id: UUID, db: Session = Depends(get_db), _admin=De
 
     db.commit()
     db.refresh(event)
-    _broadcast_current_state(db, event)
+    _broadcast_current_state(db, event, precomputed_ranking=ranking)
     return {"ok": True, "ranking_reveal_rank": event.ranking_reveal_rank}
 
 

@@ -257,7 +257,12 @@ def build_choice_out(choice, include_reveal_text: bool = False) -> dict:
     return result
 
 
-def build_monitor_state(db: Session, event: Event, include_question_details: bool = False) -> dict:
+def build_monitor_state(
+    db: Session,
+    event: Event,
+    include_question_details: bool = False,
+    precomputed_ranking: list[dict] | None = None,
+) -> dict:
     question = None
     if event.current_question_id:
         question = db.get(Question, event.current_question_id)
@@ -286,7 +291,7 @@ def build_monitor_state(db: Session, event: Event, include_question_details: boo
         "transition_question_number": None,
         "transition_is_practice": None,
         "pre_media": None,
-        "next_media_preview": build_next_media_preview(db, event),
+        "next_media_preview": None if event.phase == QuizPhase.RANKING else build_next_media_preview(db, event),
     }
     if question:
         state["transition_question_number"] = question.question_number
@@ -336,7 +341,11 @@ def build_monitor_state(db: Session, event: Event, include_question_details: boo
                 "timing": "before_correct_answer",
             }
     if event.phase.value == "RANKING":
-        state["ranking"] = compute_ranking(db, event.id, limit=settings.ranking_display_limit)
+        state["ranking"] = (
+            precomputed_ranking
+            if precomputed_ranking is not None
+            else compute_ranking(db, event.id, limit=settings.ranking_display_limit)
+        )
         state["ranking_reveal_rank"] = event.ranking_reveal_rank
     return state
 
@@ -545,10 +554,16 @@ def build_participant_states_bulk(
     return states
 
 
-def build_admin_state(db: Session, event: Event) -> dict:
+def build_admin_state(
+    db: Session,
+    event: Event,
+    precomputed_ranking: list[dict] | None = None,
+) -> dict:
     from .ws_manager import manager
 
-    state = build_monitor_state(db, event, include_question_details=True)
+    state = build_monitor_state(
+        db, event, include_question_details=True, precomputed_ranking=precomputed_ranking
+    )
     state["role"] = "admin"
     state["participant_count"] = db.query(Participant).filter(Participant.event_id == event.id).count()
     answered_count = 0
@@ -557,7 +572,11 @@ def build_admin_state(db: Session, event: Event) -> dict:
     state["answered_count"] = answered_count
     state["connected_participant_count"] = manager.count(str(event.id), "participant")
     # クイズ進行画面に常時表示するランキング上位5名(人数が0でもエラーにならない)。
-    state["top_ranking"] = compute_ranking(db, event.id, limit=5)
+    state["top_ranking"] = (
+        precomputed_ranking[:5]
+        if precomputed_ranking is not None
+        else compute_ranking(db, event.id, limit=5)
+    )
     if event.current_question_id:
         question = db.get(Question, event.current_question_id)
         if question:
@@ -571,6 +590,7 @@ def build_admin_state(db: Session, event: Event) -> dict:
                 QuizPhase.PRE_QUESTION_MEDIA,
                 QuizPhase.QUESTION_SHOWN,
                 QuizPhase.ANSWER_OPEN,
+                QuizPhase.RANKING,
             ) and correct_choice is not None:
                 state["fastest_correct_answer"] = compute_fastest_correct_answer(db, question.id)
             else:
