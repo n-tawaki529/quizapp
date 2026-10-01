@@ -800,11 +800,23 @@ th, td {
 .monitor-choice-number.color-c { background: var(--monitor-color-c); }
 .monitor-choice-number.color-d { background: var(--monitor-color-d); }
 
-.monitor-choice-text {
-  font-size: 38px;
+.monitor-choice-list-text .monitor-choice-text {
+  font-size: 64px;
   font-weight: 800;
   color: #111827;
-  line-height: 1.25;
+  line-height: 1.08;
+  max-width: 100%;
+  max-height: 2.16em;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.monitor-choice-list-text .monitor-choice-text.choice-text-medium {
+  font-size: 52px;
+}
+
+.monitor-choice-list-text .monitor-choice-text.choice-text-long {
+  font-size: 42px;
 }
 
 .monitor-choice-media-wrap {

@@ -43,7 +43,17 @@ function ChoiceCard({ choice, variant, count, dim, phase }: Props) {
       <span className={`monitor-choice-number ${colorClass}`}>{label}</span>
       <span className="monitor-choice-content">
         {choice.content_type === "TEXT" && (
-          <span className="monitor-choice-text">{choice.text}</span>
+          <span
+            className={`monitor-choice-text ${
+              (choice.text?.length ?? 0) > 24
+                ? "choice-text-long"
+                : (choice.text?.length ?? 0) > 14
+                  ? "choice-text-medium"
+                  : "choice-text-short"
+            }`}
+          >
+            {choice.text}
+          </span>
         )}
         {choice.content_type === "IMAGE" && choice.media_url && (
           <div className={`monitor-choice-media-wrap${dim ? " dim" : ""}`}>
