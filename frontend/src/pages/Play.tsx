@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { isInvalidParticipantError, participantApi } from "../api";
 import { useEventSocket } from "../useEventSocket";
-import { useCountdown } from "../useCountdown";
 import { clearParticipantSession, getParticipantSession, validateParticipantSession } from "../participantSession";
 import { ChoiceKey, ParticipantState } from "../types";
 
@@ -29,7 +28,6 @@ export default function Play() {
     participantId: session?.participant_id,
   });
 
-  const remainingMs = useCountdown(state?.answer_deadline, state?.server_time);
   const sessionToken = session?.token;
 
   useEffect(() => {
@@ -95,7 +93,6 @@ export default function Play() {
 
   const phase = state?.phase ?? "NOT_STARTED";
   const canAnswer = phase === "ANSWER_OPEN" && !locked;
-  const seconds = remainingMs !== null ? Math.ceil(remainingMs / 1000) : null;
   const feedback = (() => {
     if (phase === "RANKING" && state?.final_rank != null) {
       return { text: `最終順位 ${state.final_rank}位`, className: "feedback-final-rank" };
@@ -111,8 +108,8 @@ export default function Play() {
     if (locked && ["ANSWER_OPEN", "ANSWER_CLOSED", "ANSWER_COUNT_SHOWN"].includes(phase)) {
       return { text: "回答を受け付けました", className: "feedback-accepted" };
     }
-    if (phase === "ANSWER_OPEN" && seconds !== null) {
-      return { text: `残り ${seconds} 秒`, className: "" };
+    if (phase === "ANSWER_OPEN") {
+      return { text: "回答受付中", className: "" };
     }
     return null;
   })();
